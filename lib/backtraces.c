@@ -26,7 +26,7 @@ enum BT_RESULT {
 #define backtraces_(N) \
 	static enum BT_RESULT backtraces_##N(uint_ptr_size_t *frames) \
 	{ \
-		frames[N] = (uint_ptr_size_t) __builtin_return_address(N + 2); \
+		frames[N] = (uint_ptr_size_t) __builtin_return_address(N); \
 		return (frames[N] != ocheck_guard_frame) ? BT_HAVE_MORE : BT_DONE; \
 	}
 
