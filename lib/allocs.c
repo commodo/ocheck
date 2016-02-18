@@ -9,6 +9,7 @@
 #include "frame_size.h"
 #include "backtraces.h"
 #include "ocheck.h"
+#include "ocheck-internal.h"
 
 static uint32_t heap_pos = 0;
 static uint8_t static_heap[256 * 1024];
@@ -74,7 +75,7 @@ static void initialize()
 	initialize(); \
 
 #define END_CALL(ptr, size) \
-	if (ocheck_inited()) {\
+	if (lib_inited) {\
 		uint_ptr_size_t frames[BACK_FRAMES_COUNT] = {0}; \
 		backtraces(frames, ARRAY_SIZE(frames)); \
 		store_message(ALLOC, (uint_ptr_size_t)ptr, size, frames); \

@@ -14,6 +14,7 @@
 #include "frame_size.h"
 #include "backtraces.h"
 #include "ocheck.h"
+#include "ocheck-internal.h"
 
 #define DEFAULT_MAX_FLUSH_COUNTER	512
 static uint32_t max_flush_counter = DEFAULT_MAX_FLUSH_COUNTER;
@@ -28,10 +29,7 @@ enum FLUSH_STATE {
 };
 static enum FLUSH_STATE curr_flush_state = IDLE;
 
-bool ocheck_inited()
-{
-	return (fd > -1);
-}
+bool lib_inited = false;
 
 static inline pid_t ourgettid()
 {
@@ -258,7 +256,7 @@ static __attribute__((constructor(101))) void ocheck_init()
 	uint_ptr_size_t save_guard_frame;
 	pid_t pid;
 
-	if (fd > -1)
+	if (lib_inited)
 		return;
 
 	save_guard_frame = ocheck_guard_frame;
@@ -283,6 +281,7 @@ static __attribute__((constructor(101))) void ocheck_init()
 	write_retry(fd, (uint8_t *)&msg, sizeof(msg));
 
 	debug("done\n");
+	lib_inited = true;
 out:
 	ocheck_guard_frame = save_guard_frame;
 }
@@ -294,7 +293,7 @@ static __attribute__((destructor(101))) void ocheck_fini()
 	uint_ptr_size_t save_guard_frame;
 	pid_t pid;
 
-	if (fd < 0)
+	if (!lib_inited)
 		return;
 
 	save_guard_frame = ocheck_guard_frame;
@@ -327,5 +326,6 @@ static __attribute__((destructor(101))) void ocheck_fini()
 	debug("Done\n");
 out:
 	ocheck_guard_frame = save_guard_frame;
+	lib_inited = false;
 }
 

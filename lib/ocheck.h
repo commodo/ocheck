@@ -15,8 +15,6 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
-bool ocheck_inited();
-
 enum msg_type {
 	PROC_NAME = 1,
 	ALLOC,
@@ -44,23 +42,5 @@ struct call_msg {
 } __attribute__((__packed__));
 
 #define DEFAULT_SOCKET	"/var/run/ocheckd.socket"
-
-void store_message(enum msg_type type, uint_ptr_size_t id, size_t size, uint_ptr_size_t *frames);
-void remove_message(enum msg_type type, uint32_t id);
-
-#define debug(...) { \
-	FILE *fp = fopen("/tmp/ocheck.out", "ab"); \
-	if (fp) { \
-		fprintf(fp, __VA_ARGS__); \
-		fclose(fp); \
-	} \
-	fprintf(stderr, __VA_ARGS__); \
-}
-
-/* In case we exit because of some failure */
-#define debug_exit(...) { \
-	debug(__VA_ARGS__); \
-	exit(1); \
-}
 
 #endif
