@@ -234,10 +234,10 @@ static const char *is_this_the_right_proc()
 	const char *actual_proc_name = NULL;
 
 	if (!proc_name)
-		debug_exit("No 'PROC' env var specified");
+		debug_exit("No 'PROC' env var specified\n");
 
 	if (!(actual_proc_name = progname(pid)))
-		debug_exit("Could not get actual program name");
+		debug_exit("Could not get actual program name\n");
 
 	if (strcmp(actual_proc_name, proc_name))
 		return NULL;
