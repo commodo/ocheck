@@ -12,6 +12,7 @@
 #include <string.h>
 #include <getopt.h>
 
+#include "lib/frame_size.h"
 #include "lib/ocheck.h"
 
 static const char *sock_name = NULL;
@@ -85,7 +86,7 @@ static void ocheckd_populate_list(struct list_head *lst, const char *name)
 	void *a = blobmsg_open_array(&b, name);
 
 #define blobmsg_add_hex_string(b, k, v) \
-	snprintf(buf, sizeof(buf), "0x%08x", v); \
+	snprintf(buf, sizeof(buf), PRIxPTR1, v); \
 	blobmsg_add_string(b, k, buf);
 
 	list_for_each_entry_safe(call, tmp, lst, list) {
@@ -216,7 +217,7 @@ static void call_add(struct ocheck_client *cl, struct call_msg *msg)
 	/* Sanity */
 	struct call *call = call_find(&cl->calls, msg->id);
 	if (call) {
-		log(LOG_WARNING, "Duplicate memory entry found (%u)(0x%08x)'\n", msg->tid, msg->id);
+		log(LOG_WARNING, "Duplicate memory entry found (%u)("PRIxPTR1")'\n", msg->tid, msg->id);
 		memcpy(&call->msg, msg, sizeof(call->msg));
 		return;
 	}

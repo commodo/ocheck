@@ -1,6 +1,9 @@
 #ifndef __OCHECK_H__
 #define __OCHECK_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #define PROC_NAME_LEN	32
 
 /* Something to identify the message type */
@@ -34,15 +37,15 @@ struct proc_msg {
 struct call_msg {
 	uint32_t magic;
 	uint16_t type;
-	uint32_t id; /* Could be ptr, fd, some other ID */
+	uint_ptr_size_t id; /* Could be ptr, fd, some other ID */
 	uint16_t tid;
-	uint32_t frames[BACK_FRAMES_COUNT];
+	uint_ptr_size_t frames[BACK_FRAMES_COUNT];
 	uint32_t size;
 } __attribute__((__packed__));
 
 #define DEFAULT_SOCKET	"/var/run/ocheckd.socket"
 
-void store_message(enum msg_type type, uint32_t id, size_t size, uint32_t *frames);
+void store_message(enum msg_type type, uint_ptr_size_t id, size_t size, uint_ptr_size_t *frames);
 void remove_message(enum msg_type type, uint32_t id);
 
 #define debug(...) { \

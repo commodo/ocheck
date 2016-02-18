@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <errno.h>
 
+#include "frame_size.h"
 #include "backtraces.h"
 #include "ocheck.h"
 
@@ -159,7 +160,7 @@ static inline struct call_msg *call_msg_get_free()
 	return NULL;
 }
 
-void store_message(enum msg_type type, uint32_t id, size_t size, uint32_t *frames)
+void store_message(enum msg_type type, uint_ptr_size_t id, size_t size, uint_ptr_size_t *frames)
 {
 	struct call_msg *msg;
 
@@ -254,14 +255,14 @@ static __attribute__((constructor(101))) void ocheck_init()
 	struct proc_msg msg;
 	const char *proc_name;
 	const char *s;
-	uint32_t save_guard_frame;
+	uint_ptr_size_t save_guard_frame;
 	pid_t pid;
 
 	if (fd > -1)
 		return;
 
 	save_guard_frame = ocheck_guard_frame;
-	ocheck_guard_frame = (uint32_t) __builtin_return_address(0);
+	ocheck_guard_frame = (uint_ptr_size_t) __builtin_return_address(0);
 	if (!(proc_name = is_this_the_right_proc()))
 		goto out;
 	unlink("/tmp/ocheck.out");
@@ -290,14 +291,14 @@ static __attribute__((destructor(101))) void ocheck_fini()
 {
 	uint32_t flushed = 0;
 	const char *proc_name;
-	uint32_t save_guard_frame;
+	uint_ptr_size_t save_guard_frame;
 	pid_t pid;
 
 	if (fd < 0)
 		return;
 
 	save_guard_frame = ocheck_guard_frame;
-	ocheck_guard_frame = (uint32_t) __builtin_return_address(0);
+	ocheck_guard_frame = (uint_ptr_size_t) __builtin_return_address(0);
 	if (!(proc_name = is_this_the_right_proc()))
 		goto out;
 
