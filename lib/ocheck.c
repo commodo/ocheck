@@ -21,6 +21,7 @@ static uint32_t max_flush_counter = DEFAULT_MAX_FLUSH_COUNTER;
 static int fd = -1;
 static struct call_msg messages[32 * 1024] = {0};
 static int flush_counter = -1;
+static pid_t pid = -1;
 
 enum FLUSH_STATE {
 	IDLE = 0,
@@ -235,7 +236,7 @@ static const char *is_this_the_right_proc()
 	if (!proc_name)
 		debug_exit("No 'PROC' env var specified");
 
-	if (!(actual_proc_name = progname(ourgetpid())))
+	if (!(actual_proc_name = progname(pid)))
 		debug_exit("Could not get actual program name");
 
 	if (strcmp(actual_proc_name, proc_name))
@@ -253,17 +254,18 @@ static __attribute__((constructor(101))) void ocheck_init()
 	struct proc_msg msg;
 	const char *proc_name;
 	const char *s;
-	pid_t pid;
 
 	if (lib_inited)
 		return;
 
 	backtraces_set_max_backtraces(0);
+	pid = ourgetpid();
+	if (pid < 0)
+		debug_exit("Could not get pid\n");
 	if (!(proc_name = is_this_the_right_proc()))
 		return;
 	unlink("/tmp/ocheck.out");
 
-	pid = ourgetpid();
 	debug("Initializing libocheck.so for %s.%u... ", proc_name, pid);
 
 	initialize_sock();
@@ -275,7 +277,7 @@ static __attribute__((constructor(101))) void ocheck_init()
 	/* We won't get here, since initialize_sock() calls exit(1) in case something does not init  */
 	msg.magic = MSG_MAGIC_NUMBER;
 	msg.type  = PROC_NAME;
-	snprintf(msg.name, sizeof(msg.name), "%s.%d", proc_name, ourgetpid());
+	snprintf(msg.name, sizeof(msg.name), "%s.%d", proc_name, pid);
 	write_retry(fd, (uint8_t *)&msg, sizeof(msg));
 
 	debug("done\n");
@@ -287,7 +289,6 @@ static __attribute__((destructor(101))) void ocheck_fini()
 {
 	uint32_t flushed = 0;
 	const char *proc_name;
-	pid_t pid;
 
 	if (!lib_inited)
 		return;
@@ -296,7 +297,6 @@ static __attribute__((destructor(101))) void ocheck_fini()
 	if (!(proc_name = is_this_the_right_proc()))
 		goto out;
 
-	pid = ourgetpid();
 	debug("Uninitializing libocheck.so for %s.%u...\n", proc_name, pid);
 
 	/* Make sure flush_counter cannot get to zero */
@@ -315,8 +315,8 @@ static __attribute__((destructor(101))) void ocheck_fini()
 
 	debug("  Flushed %u messages\n", flushed);
 
-	if (flushed)
-		kill(ourgetpid(), SIGSEGV);
+	if (pid > -1 && flushed)
+		kill(pid, SIGSEGV);
 
 	debug("Done\n");
 out:
