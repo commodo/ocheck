@@ -289,7 +289,6 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 				break;
 			case CLEAR:
 				r = handle_clear_msg(cl, msg_pos);
-				ocheck_client_calls_clear_list(cl);
 				break;
 			default:
 				log(LOG_ERR, "Invalid message type: %u\n", msg->type);
