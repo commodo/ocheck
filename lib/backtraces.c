@@ -6,6 +6,12 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
+static uint32_t g_max_backtraces = 0;
+void backtraces_set_max_backtraces(uint32_t max_backtraces)
+{
+	g_max_backtraces = max_backtraces;
+}
+
 /* For a lot of cases, the top stack frame (or anything after that) should be zero.
    But gcc docs says that this is arch dependant, so this should be called in the
    main() function with 'ocheck_guard_frame = (uint32_t) __builtin_return_address(0);'.
@@ -73,7 +79,7 @@ static backtraces_func backtraces_funcs[] = {
 void backtraces(uint_ptr_size_t *frames, uint32_t max_frames)
 {
 	int i, res = BT_HAVE_MORE;
-	for (i = 0; i < max_frames && backtraces_funcs[i] && res == BT_HAVE_MORE; i++)
+	for (i = 0; i < g_max_backtraces && i < max_frames && backtraces_funcs[i] && res == BT_HAVE_MORE; i++)
 		res = backtraces_funcs[i](frames);
 }
 

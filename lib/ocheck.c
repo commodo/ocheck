@@ -253,16 +253,14 @@ static __attribute__((constructor(101))) void ocheck_init()
 	struct proc_msg msg;
 	const char *proc_name;
 	const char *s;
-	uint_ptr_size_t save_guard_frame;
 	pid_t pid;
 
 	if (lib_inited)
 		return;
 
-	save_guard_frame = ocheck_guard_frame;
-	ocheck_guard_frame = (uint_ptr_size_t) __builtin_return_address(0);
+	backtraces_set_max_backtraces(0);
 	if (!(proc_name = is_this_the_right_proc()))
-		goto out;
+		return;
 	unlink("/tmp/ocheck.out");
 
 	pid = ourgetpid();
@@ -282,22 +280,19 @@ static __attribute__((constructor(101))) void ocheck_init()
 
 	debug("done\n");
 	lib_inited = true;
-out:
-	ocheck_guard_frame = save_guard_frame;
+	backtraces_set_max_backtraces(BACK_FRAMES_COUNT);
 }
 
 static __attribute__((destructor(101))) void ocheck_fini()
 {
 	uint32_t flushed = 0;
 	const char *proc_name;
-	uint_ptr_size_t save_guard_frame;
 	pid_t pid;
 
 	if (!lib_inited)
 		return;
 
-	save_guard_frame = ocheck_guard_frame;
-	ocheck_guard_frame = (uint_ptr_size_t) __builtin_return_address(0);
+	backtraces_set_max_backtraces(0);
 	if (!(proc_name = is_this_the_right_proc()))
 		goto out;
 
@@ -325,7 +320,6 @@ static __attribute__((destructor(101))) void ocheck_fini()
 
 	debug("Done\n");
 out:
-	ocheck_guard_frame = save_guard_frame;
 	lib_inited = false;
 }
 
