@@ -273,9 +273,8 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 	if (u->eof)
 		/* Socket EOF'd/closed ; do not free client data ; we need it for analysis */
 		uloop_fd_delete(u);
-	else
-		while ((r = read(u->fd, &cl->buf[cl->len], sizeof(cl->buf) - cl->len)) > 0)
-			cl->len += r;
+	while ((r = read(u->fd, &cl->buf[cl->len], sizeof(cl->buf) - cl->len)) > 0)
+		cl->len += r;
 
 	while (cl->len > 0) {
 		msg = (struct msg_common *)&cl->buf[msg_pos];
@@ -298,17 +297,16 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 		if (r <= 0) {
 			if (msg_pos > 0)
 				memcpy(&cl->buf[0], &cl->buf[msg_pos], cl->len);
-			if (u->eof) {
+			if (u->eof)
 				log(LOG_WARNING, "Socket was closed, but there were still some bytes left (%u)\n", cl->len);
-				ocheck_client_delete_empty(cl);
-			}
-			return;
+			goto out;
 		}
 
 		msg_pos += r;
 		cl->len -= r;
 	}
 
+out:
 	ocheck_client_delete_empty(cl);
 }
 
