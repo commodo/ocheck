@@ -255,7 +255,8 @@ static __attribute__((constructor(101))) void ocheck_init()
 	const char *proc_name;
 	const char *s;
 
-	if (lib_inited)
+	/* Do not re-initialize if already initialized and it's the same pid */
+	if (lib_inited && (pid == ourgetpid()))
 		return;
 
 	backtraces_set_max_backtraces(0);
@@ -290,7 +291,8 @@ static __attribute__((destructor(101))) void ocheck_fini()
 	uint32_t flushed = 0;
 	const char *proc_name;
 
-	if (!lib_inited)
+	/* Prevent forks from calling de-init code */
+	if (!lib_inited || pid != ourgetpid())
 		return;
 
 	backtraces_set_max_backtraces(0);
