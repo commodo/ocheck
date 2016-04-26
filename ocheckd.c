@@ -8,6 +8,8 @@
 #include <libubox/uloop.h>
 #include <libubox/usock.h>
 #include <libubus.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <syslog.h>
 #include <string.h>
 #include <getopt.h>

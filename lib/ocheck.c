@@ -10,6 +10,7 @@
 #include <sys/un.h>
 #include <signal.h>
 #include <errno.h>
+#include <string.h>
 
 #include "frame_size.h"
 #include "backtraces.h"
