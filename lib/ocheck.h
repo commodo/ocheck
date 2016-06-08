@@ -35,9 +35,9 @@ struct proc_msg {
 struct call_msg {
 	uint32_t magic;
 	uint16_t type;
-	uint_ptr_size_t id; /* Could be ptr, fd, some other ID */
+	uintptr_t id; /* Could be ptr, fd, some other ID */
 	uint16_t tid;
-	uint_ptr_size_t frames[BACK_FRAMES_COUNT];
+	uintptr_t frames[BACK_FRAMES_COUNT];
 	uint32_t size;
 } __attribute__((__packed__));
 

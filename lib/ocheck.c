@@ -12,7 +12,6 @@
 #include <errno.h>
 #include <string.h>
 
-#include "frame_size.h"
 #include "backtraces.h"
 #include "ocheck.h"
 #include "ocheck-internal.h"
@@ -160,7 +159,7 @@ static inline struct call_msg *call_msg_get_free()
 	return NULL;
 }
 
-void store_message(enum msg_type type, uint_ptr_size_t id, size_t size, uint_ptr_size_t *frames)
+void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *frames)
 {
 	struct call_msg *msg;
 
