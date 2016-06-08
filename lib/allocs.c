@@ -6,7 +6,6 @@
 #include <string.h>
 #include <errno.h>
 
-#include "frame_size.h"
 #include "backtraces.h"
 #include "ocheck.h"
 #include "ocheck-internal.h"
@@ -76,9 +75,9 @@ static void initialize()
 
 #define END_CALL(ptr, size) \
 	if (lib_inited) {\
-		uint_ptr_size_t frames[BACK_FRAMES_COUNT] = {0}; \
+		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
 		backtraces(frames, ARRAY_SIZE(frames)); \
-		store_message(ALLOC, (uint_ptr_size_t)ptr, size, frames); \
+		store_message(ALLOC, (uintptr_t)ptr, size, frames); \
 	}
 
 void* malloc(size_t size)
@@ -105,7 +104,7 @@ void* realloc(void *ptr, size_t size)
 	START_CALL();
 	out_ptr = real_realloc(ptr, size);
 	if (ptr != out_ptr)
-		remove_message(ALLOC, (uint_ptr_size_t)ptr);
+		remove_message(ALLOC, (uintptr_t)ptr);
 	END_CALL(out_ptr, size);
 	return out_ptr;
 }
@@ -115,7 +114,7 @@ void free(void *ptr)
 	START_CALL();
 	real_free(ptr);
 	if (ptr)
-		remove_message(ALLOC, (uint_ptr_size_t)ptr);
+		remove_message(ALLOC, (uintptr_t)ptr);
 }
 
 void* memalign(size_t blocksize, size_t bytes)

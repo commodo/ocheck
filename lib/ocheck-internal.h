@@ -5,7 +5,7 @@
 
 extern bool lib_inited;
 
-void store_message(enum msg_type type, uint_ptr_size_t id, size_t size, uint_ptr_size_t *frames);
+void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *frames);
 void remove_message(enum msg_type type, uint32_t id);
 
 #define debug(...) { \

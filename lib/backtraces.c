@@ -1,5 +1,4 @@
 
-#include "frame_size.h"
 #include "backtraces.h"
 
 #ifndef ARRAY_SIZE
@@ -16,7 +15,7 @@ void backtraces_set_max_backtraces(uint32_t max_backtraces)
    But gcc docs says that this is arch dependant, so this should be called in the
    main() function with 'ocheck_guard_frame = (uint32_t) __builtin_return_address(0);'.
 */
-uint_ptr_size_t ocheck_guard_frame = 0;
+uintptr_t ocheck_guard_frame = 0;
 
 enum BT_RESULT {
     BT_DONE,
@@ -30,9 +29,9 @@ enum BT_RESULT {
 */
 
 #define backtraces_(N) \
-	static enum BT_RESULT backtraces_##N(uint_ptr_size_t *frames) \
+	static enum BT_RESULT backtraces_##N(uintptr_t *frames) \
 	{ \
-		frames[N] = (uint_ptr_size_t) __builtin_return_address(N); \
+		frames[N] = (uintptr_t) __builtin_return_address(N); \
 		return (frames[N] != ocheck_guard_frame) ? BT_HAVE_MORE : BT_DONE; \
 	}
 
@@ -53,7 +52,7 @@ backtraces_(13);
 backtraces_(14);
 backtraces_(15);
 
-typedef enum BT_RESULT (*backtraces_func)(uint_ptr_size_t *);
+typedef enum BT_RESULT (*backtraces_func)(uintptr_t *);
 
 static backtraces_func backtraces_funcs[] = {
 	backtraces_0,
@@ -76,7 +75,7 @@ static backtraces_func backtraces_funcs[] = {
 };
 
 /* https://gcc.gnu.org/bugzilla/show_bug.cgi?id=8743 */
-void backtraces(uint_ptr_size_t *frames, uint32_t max_frames)
+void backtraces(uintptr_t *frames, uint32_t max_frames)
 {
 	int i, res = BT_HAVE_MORE;
 	for (i = 0; i < g_max_backtraces && i < max_frames && backtraces_funcs[i] && res == BT_HAVE_MORE; i++)
