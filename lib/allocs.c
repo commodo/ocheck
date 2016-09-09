@@ -71,14 +71,10 @@ static void initialize()
 }
 
 #define START_CALL() \
-	initialize(); \
+	initialize();
 
-#define END_CALL(ptr, size) \
-	if (lib_inited) {\
-		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
-		backtraces(frames, ARRAY_SIZE(frames)); \
-		store_message(ALLOC, (uintptr_t)ptr, size, frames); \
-	}
+#define END_CALL(ptr,size) \
+	PUSH_MSG(ALLOC, ptr, size)
 
 void* malloc(size_t size)
 {
