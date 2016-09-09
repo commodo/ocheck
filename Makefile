@@ -10,7 +10,8 @@ ocheckd_OBJS:= \
 libocheck_OBJS:= \
 	lib/ocheck.o \
 	lib/backtraces.o \
-	lib/allocs.o
+	lib/allocs.o \
+	lib/file.o
 
 libocheck.so: $(libocheck_OBJS)
 	$(CC) -shared $(LDFLAGS) $(CFLAGS) -o $@ $^ -ldl

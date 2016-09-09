@@ -133,6 +133,7 @@ static int ocheckd_list_handler(struct ubus_context *ctx,
 	list_for_each_entry_safe(cl, tmp, &ocheck_client_list, list) {
 		void *p = blobmsg_open_table(&b, cl->proc);
 		ocheckd_populate_list(&cl->calls, "allocs", ALLOC);
+		ocheckd_populate_list(&cl->calls, "files", FILES);
 		blobmsg_close_table(&b, p);
 	}
 
@@ -292,6 +293,7 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 			case PROC_NAME:
 				r = handle_proc_name_msg(cl, msg_pos);
 				break;
+			case FILES:
 			case ALLOC:
 				r = handle_call_msg(cl, msg_pos);
 				break;
