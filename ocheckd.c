@@ -85,7 +85,7 @@ static void ocheckd_populate_list(struct list_head *lst, const char *name)
 {
 	struct call *call, *tmp;
 	uint32_t call_count = 0;
-	char buf[16];
+	char buf[19];
 	void *a = blobmsg_open_array(&b, name);
 
 #define blobmsg_add_hex_string(b, k, v) \
