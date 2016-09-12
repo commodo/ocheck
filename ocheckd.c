@@ -81,7 +81,9 @@ static void ocheckd_connect_handler(struct ubus_context *ctx)
 	ubus_add_object(ctx, &ocheckd_object);
 }
 
-static void ocheckd_populate_list(struct list_head *lst, const char *name)
+static void ocheckd_populate_list(struct list_head *lst,
+	const char *name,
+	enum msg_type type)
 {
 	struct call *call, *tmp;
 	uint32_t call_count = 0;
@@ -93,9 +95,13 @@ static void ocheckd_populate_list(struct list_head *lst, const char *name)
 	blobmsg_add_string(b, k, buf);
 
 	list_for_each_entry_safe(call, tmp, lst, list) {
+		struct call_msg *m = &call->msg;
+
+		if (m->type != type)
+			continue;
+
 		int i;
 		void *t = blobmsg_open_table(&b, "");
-		struct call_msg *m = &call->msg;
 
 		blobmsg_add_u32(&b, "tid", m->tid);
 		blobmsg_add_hex_string(&b, "ptr", m->id);
@@ -126,7 +132,8 @@ static int ocheckd_list_handler(struct ubus_context *ctx,
 
 	list_for_each_entry_safe(cl, tmp, &ocheck_client_list, list) {
 		void *p = blobmsg_open_table(&b, cl->proc);
-		ocheckd_populate_list(&cl->calls, "allocs");
+		ocheckd_populate_list(&cl->calls, "allocs", ALLOC);
+		ocheckd_populate_list(&cl->calls, "files", FILES);
 		blobmsg_close_table(&b, p);
 	}
 
@@ -200,7 +207,7 @@ static inline void __create_call_to_list(struct list_head *lst, struct call_msg 
 	list_add(&call->list, lst);
 }
 
-static inline struct call *call_find(struct list_head *lst, uint32_t id)
+static inline struct call *call_find(struct list_head *lst, struct call_msg *msg)
 {
 	struct call *call, *tmp;
 
@@ -209,7 +216,7 @@ static inline struct call *call_find(struct list_head *lst, uint32_t id)
 
 	list_for_each_entry_safe(call, tmp, lst, list) {
 		struct call_msg *m = &call->msg;
-		if (m->id == id)
+		if ((m->id == msg->id) && (m->type == msg->type))
 			return call;
 	}
 	return NULL;
@@ -218,7 +225,7 @@ static inline struct call *call_find(struct list_head *lst, uint32_t id)
 static void call_add(struct ocheck_client *cl, struct call_msg *msg)
 {
 	/* Sanity */
-	struct call *call = call_find(&cl->calls, msg->id);
+	struct call *call = call_find(&cl->calls, msg);
 	if (call) {
 		log(LOG_WARNING, "Duplicate memory entry found (%u)(0x%"PRIxPTR_PAD")'\n", msg->tid, msg->id);
 		memcpy(&call->msg, msg, sizeof(call->msg));
@@ -286,6 +293,7 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 			case PROC_NAME:
 				r = handle_proc_name_msg(cl, msg_pos);
 				break;
+			case FILES:
 			case ALLOC:
 				r = handle_call_msg(cl, msg_pos);
 				break;

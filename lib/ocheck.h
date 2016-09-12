@@ -18,6 +18,7 @@
 enum msg_type {
 	PROC_NAME = 1,
 	ALLOC,
+	FILES,
 	CLEAR,
 };
 
