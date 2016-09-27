@@ -197,8 +197,10 @@ void remove_message(enum msg_type type, uint32_t id)
 {
 	struct call_msg *msg;
 	/* FIXME: this can be an invalid call/free ; store later */
-	if ((msg = call_msg_find(type, id)))
+	if ((msg = call_msg_find(type, id))) {
+		msg->type = INVALID;
 		msg->id = 0;
+	}
 }
 
 static const char *progname(int pid)

@@ -16,6 +16,7 @@
 #endif
 
 enum msg_type {
+	INVALID = 0,
 	PROC_NAME = 1,
 	ALLOC,
 	FILES,
