@@ -109,8 +109,7 @@ void free(void *ptr)
 {
 	START_CALL();
 	real_free(ptr);
-	if (ptr)
-		remove_message(ALLOC, (uintptr_t)ptr);
+	remove_message(ALLOC, (uintptr_t)ptr);
 }
 
 void* memalign(size_t blocksize, size_t bytes)

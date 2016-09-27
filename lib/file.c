@@ -51,10 +51,8 @@ int fclose(FILE* fd)
 {
 	int result = EOF;
 	START_CALL();
-	if (fd != NULL) {
-		result = real_fclose(fd);
-		remove_message(FILES, (uintptr_t)fd);
-	}
+	result = real_fclose(fd);
+	remove_message(FILES, (uintptr_t)fd);
 	return result;
 }
 
@@ -74,9 +72,7 @@ int close(int fd)
 {
 	int result = -1;
 	START_CALL();
-	if (fd >= 0) {
-		result = real_close(fd);
-		remove_message(FILES, (uintptr_t)fd);
-	}
+	result = real_close(fd);
+	remove_message(FILES, fd);
 	return result;
 }
