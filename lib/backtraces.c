@@ -18,8 +18,8 @@ void backtraces_set_max_backtraces(uint32_t max_backtraces)
 uintptr_t ocheck_guard_frame = 0;
 
 enum BT_RESULT {
-    BT_DONE,
-    BT_HAVE_MORE,
+	BT_DONE,
+	BT_HAVE_MORE,
 };
 
 /*
