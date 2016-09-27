@@ -88,7 +88,9 @@ static void ocheckd_populate_list(struct list_head *lst,
 	struct call *call, *tmp;
 	uint32_t call_count = 0;
 	char buf[19];
-	void *a = blobmsg_open_array(&b, name);
+	void *elems, *a = blobmsg_open_table(&b, name);
+
+	elems = blobmsg_open_array(&b, "elems");
 
 #define blobmsg_add_hex_string(b, k, v) \
 	snprintf(buf, sizeof(buf), "0x%"PRIxPTR_PAD, v); \
@@ -116,8 +118,9 @@ static void ocheckd_populate_list(struct list_head *lst,
 		blobmsg_close_table(&b, t);
 	}
 
-	blobmsg_close_array(&b, a);
+	blobmsg_close_array(&b, elems);
 	blobmsg_add_u32(&b, "count", call_count);
+	blobmsg_close_table(&b, a);
 }
 
 static int ocheckd_list_handler(struct ubus_context *ctx,
