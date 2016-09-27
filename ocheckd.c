@@ -106,7 +106,8 @@ static void ocheckd_populate_list(struct list_head *lst,
 		void *t = blobmsg_open_table(&b, "");
 
 		blobmsg_add_u32(&b, "tid", m->tid);
-		blobmsg_add_hex_string(&b, "ptr", m->id);
+		blobmsg_add_hex_string(&b, "ptr", m->ptr);
+		blobmsg_add_u32(&b, "fd", m->fd);
 		for (i = 0; i < BACK_FRAMES_COUNT && m->frames[i]; i++) {
 			char frame_name[sizeof("frameX") + 1];
 			snprintf(frame_name, sizeof(frame_name), "frame%d", i);
@@ -219,7 +220,7 @@ static inline struct call *call_find(struct list_head *lst, struct call_msg *msg
 
 	list_for_each_entry_safe(call, tmp, lst, list) {
 		struct call_msg *m = &call->msg;
-		if ((m->id == msg->id) && (m->type == msg->type))
+		if ((m->ptr == msg->ptr) && (m->fd == msg->fd) && (m->type == msg->type))
 			return call;
 	}
 	return NULL;
@@ -230,7 +231,7 @@ static void call_add(struct ocheck_client *cl, struct call_msg *msg)
 	/* Sanity */
 	struct call *call = call_find(&cl->calls, msg);
 	if (call) {
-		log(LOG_WARNING, "Duplicate memory entry found (%u)(0x%"PRIxPTR_PAD")'\n", msg->tid, msg->id);
+		log(LOG_WARNING, "Duplicate memory entry found (%u)(0x%"PRIxPTR_PAD")(%d)'\n", msg->tid, msg->ptr, msg->fd);
 		memcpy(&call->msg, msg, sizeof(call->msg));
 		return;
 	}

@@ -132,7 +132,7 @@ static uint32_t flush_messages(bool now)
 
 	for (i = 0; i < ARRAY_SIZE(messages) && curr_flush_state == BUSY; i++) {
 		struct call_msg *msg = &messages[i];
-		if (!msg->id) /* For now we consider non-zero IDs as valid IDs ; this could change */
+		if (!msg->ptr && msg->fd < 0)
 			continue;
 		if (write_retry(fd, (uint8_t *) msg, sizeof(*msg)) < 0)
 			debug_exit("Could not send message ; errno %d\n", errno);
@@ -143,13 +143,46 @@ static uint32_t flush_messages(bool now)
 	return flushed;
 }
 
-static inline struct call_msg *call_msg_find(enum msg_type type, uint32_t id)
+static inline void call_msg_invalidate(struct call_msg *msg)
+{
+	if (msg) {
+		msg->type = INVALID;
+		msg->ptr = 0;
+		msg->fd = -1;
+	}
+}
+
+static struct call_msg *call_msg_find_by_ptr(enum msg_type type, uintptr_t ptr)
 {
 	int i;
-	if (!id)
+	if (!ptr)
 		return NULL;
 	for (i = 0; i < ARRAY_SIZE(messages); i++) {
-		if (messages[i].type == type && messages[i].id == id)
+		if (messages[i].type == type && messages[i].ptr == ptr)
+			return &messages[i];
+	}
+	return NULL;
+}
+
+static struct call_msg *call_msg_find_by_fd(enum msg_type type, int fd)
+{
+	int i;
+	if (fd < 0)
+		return NULL;
+	for (i = 0; i < ARRAY_SIZE(messages); i++) {
+		if (messages[i].type == type && messages[i].fd == fd)
+			return &messages[i];
+	}
+	return NULL;
+}
+
+static inline struct call_msg *call_msg_find(enum msg_type type, uintptr_t ptr, int fd)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(messages); i++) {
+		if (messages[i].type != type)
+			continue;
+		if (messages[i].ptr == ptr && messages[i].fd == fd)
 			return &messages[i];
 	}
 	return NULL;
@@ -159,22 +192,21 @@ static inline struct call_msg *call_msg_get_free()
 {
 	int i;
 	for (i = 0; i < ARRAY_SIZE(messages); i++) {
-		/* For now we consider non-zero IDs as valid IDs ; this could change */
-		if (!messages[i].id)
+		if (messages[i].type == INVALID)
 			return &messages[i];
 	}
 	return NULL;
 }
 
-void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *frames)
+void store_message(enum msg_type type, uintptr_t ptr, int fd, size_t size, uintptr_t *frames)
 {
 	struct call_msg *msg;
 
-	/* FIXME: see what we do in this case ; this looks like a malfunction ; for now we ignore */
-	if ((msg = call_msg_find(type, id)))
-		msg->id = 0;
+	if (fd < 0 && !ptr)
+		return;
 
-	if (!msg) {
+	/* FIXME: see what we do in this case ; this looks like a malfunction ; for now we ignore */
+	if (!(msg = call_msg_find(type, ptr, fd))) {
 		msg = call_msg_get_free();
 		if (!msg)
 			debug_exit("No more room to store calls\n");
@@ -183,7 +215,8 @@ void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *fra
 	msg->magic = MSG_MAGIC_NUMBER;
 	msg->type  = type;
 	msg->tid   = ourgettid();
-	msg->id    = id;
+	msg->ptr   = ptr;
+	msg->fd    = fd;
 	msg->size  = size; 
 	memcpy(msg->frames, frames, sizeof(msg->frames));
 
@@ -193,14 +226,14 @@ void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *fra
 	flush_messages(false);
 }
 
-void remove_message(enum msg_type type, uint32_t id)
+void remove_message_by_ptr(enum msg_type type, uintptr_t ptr)
 {
-	struct call_msg *msg;
-	/* FIXME: this can be an invalid call/free ; store later */
-	if ((msg = call_msg_find(type, id))) {
-		msg->type = INVALID;
-		msg->id = 0;
-	}
+	call_msg_invalidate(call_msg_find_by_ptr(type, ptr));
+}
+
+void remove_message_by_fd(enum msg_type type, int fd)
+{
+	call_msg_invalidate(call_msg_find_by_fd(type, fd));
 }
 
 static const char *progname(int pid)
@@ -310,6 +343,7 @@ static __attribute__((constructor(101))) void ocheck_init()
 	struct proc_msg msg;
 	const char *proc_name;
 	const char *s;
+	int i;
 
 	/* Do not re-initialize if already initialized and it's the same pid */
 	if (lib_inited && (pid == ourgetpid()))
@@ -332,6 +366,10 @@ static __attribute__((constructor(101))) void ocheck_init()
 	/* if max_flush_counter <= 0 then flush only on ocheck_fini() */
 	if ((s = getenv("FLUSH_COUNT")))
 		max_flush_counter = atoi(s);
+
+	/* Initialize fd to negative */
+	for (i = 0; i < ARRAY_SIZE(messages); i++)
+		messages[i].fd = -1;
 
 	/* We won't get here, since initialize_sock() calls exit(1) in case something does not init  */
 	msg.magic = MSG_MAGIC_NUMBER;

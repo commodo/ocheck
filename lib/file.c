@@ -35,15 +35,15 @@ static void initialize()
 #define START_CALL() \
 	initialize();
 
-#define END_CALL(fd) \
-	PUSH_MSG(FILES, fd, 0)
+#define END_CALL(ptr, fd) \
+	PUSH_MSG(FILES, ptr, fd, 0)
 
 FILE* fopen(const char* filename, const char* mode)
 {
 	FILE* fd = NULL;
 	START_CALL();
 	fd = real_fopen(filename, mode);
-	END_CALL(fd);
+	END_CALL(fd, -1);
 	return fd;
 }
 
@@ -52,7 +52,7 @@ int fclose(FILE* fd)
 	int result = EOF;
 	START_CALL();
 	result = real_fclose(fd);
-	remove_message(FILES, (uintptr_t)fd);
+	remove_message_by_ptr(FILES, (uintptr_t)fd);
 	return result;
 }
 
@@ -64,7 +64,7 @@ int open(const char *filename, int flags, ...)
 	va_start(args, flags);
 	fd = real_open(filename, flags, args);
 	va_end(args);
-	END_CALL(fd);
+	END_CALL(NULL, fd);
 	return fd;
 }
 
@@ -73,6 +73,6 @@ int close(int fd)
 	int result = -1;
 	START_CALL();
 	result = real_close(fd);
-	remove_message(FILES, fd);
+	remove_message_by_fd(FILES, fd);
 	return result;
 }

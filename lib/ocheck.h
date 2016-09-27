@@ -37,7 +37,8 @@ struct proc_msg {
 struct call_msg {
 	uint32_t magic;
 	uint16_t type;
-	uintptr_t id; /* Could be ptr, fd, some other ID */
+	uintptr_t ptr;
+	int fd;
 	uint16_t tid;
 	uintptr_t frames[BACK_FRAMES_COUNT];
 	uint32_t size;

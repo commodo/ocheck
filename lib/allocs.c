@@ -74,7 +74,7 @@ static void initialize()
 	initialize();
 
 #define END_CALL(ptr,size) \
-	PUSH_MSG(ALLOC, ptr, size)
+	PUSH_MSG(ALLOC, ptr, -1, size)
 
 void* malloc(size_t size)
 {
@@ -100,7 +100,7 @@ void* realloc(void *ptr, size_t size)
 	START_CALL();
 	out_ptr = real_realloc(ptr, size);
 	if (ptr != out_ptr)
-		remove_message(ALLOC, (uintptr_t)ptr);
+		remove_message_by_ptr(ALLOC, (uintptr_t)ptr);
 	END_CALL(out_ptr, size);
 	return out_ptr;
 }
@@ -109,7 +109,7 @@ void free(void *ptr)
 {
 	START_CALL();
 	real_free(ptr);
-	remove_message(ALLOC, (uintptr_t)ptr);
+	remove_message_by_ptr(ALLOC, (uintptr_t)ptr);
 }
 
 void* memalign(size_t blocksize, size_t bytes)
