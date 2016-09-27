@@ -111,7 +111,7 @@ static int write_retry(int fd, uint8_t *buf, uint32_t buf_len)
 	return -1;
 }
 
-static uint32_t flush_messages()
+static uint32_t flush_messages(bool now)
 {
 	uint32_t i, flushed = 0;
 	struct msg_common clr = { .magic = MSG_MAGIC_NUMBER, .type = CLEAR };
@@ -119,6 +119,12 @@ static uint32_t flush_messages()
 	/* Not inited, can't flush */
 	if (fd < 0)
 		return 0;
+
+	if (!now && --flush_counter > 0)
+		return 0;
+
+	/* Make sure flush_counter cannot get to zero while calling flush_messages() */
+	flush_counter = 999999999;
 
 	curr_flush_state = BUSY;
 	if (write_retry(fd, (uint8_t *) &clr, sizeof(clr)) < 0)
@@ -133,6 +139,7 @@ static uint32_t flush_messages()
 		flushed++;
 	}
 	curr_flush_state = IDLE;
+	flush_counter = max_flush_counter;
 	return flushed;
 }
 
@@ -183,12 +190,7 @@ void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *fra
 	if (max_flush_counter <= 0)
 		return;
 
-	if (--flush_counter > 0)
-		return;
-	/* Make sure flush_counter cannot get to zero while calling flush_messages() */
-	flush_counter = 999999999;
-	flush_messages();
-	flush_counter = max_flush_counter;
+	flush_messages(false);
 }
 
 void remove_message(enum msg_type type, uint32_t id)
@@ -301,8 +303,6 @@ static __attribute__((destructor(101))) void ocheck_fini()
 
 	debug("Uninitializing libocheck.so for %s.%u...\n", proc_name, pid);
 
-	/* Make sure flush_counter cannot get to zero */
-	flush_counter = 999999999;
 	if (fd > -1) {
 		if (curr_flush_state == BUSY) {
 			debug("  Flushing still in progress...\n");
@@ -311,7 +311,7 @@ static __attribute__((destructor(101))) void ocheck_fini()
 				wait_data(fd, true);
 		}
 
-		flushed = flush_messages();
+		flushed = flush_messages(true);
 		close(fd);
 	}
 
