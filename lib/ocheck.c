@@ -6,13 +6,13 @@
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <dlfcn.h>
 #include <poll.h>
 #include <sys/un.h>
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
 
-#include "backtraces.h"
 #include "ocheck.h"
 #include "ocheck-internal.h"
 
@@ -249,6 +249,58 @@ static const char *is_this_the_right_proc()
 	return proc_name;
 }
 
+/* Ah, parsing in C (and with no allocs), such a "joy" ; look mom, no hands */
+static void parse_ignore_backtraces()
+{
+	/* Note: functions can be provided as 'IGNORE_BT=func1:300,func2:400'
+	   So, each pair is separated by a comma and is a tuple of
+	   function name + an arbitrary offset (in decimal).
+	   Only functions that are exported will work (usually).
+	*/
+	const char *ignore_bts = getenv("IGNORE_BT");
+	int len;
+	const char *endp, *lastp;
+	/* no allocs, because "who knows ?" */
+	char buf[64] = "";
+
+	if (!ignore_bts) {
+		debug("\n Ignore list empty\n");
+		return;
+	}
+	len = strlen(ignore_bts);
+
+	lastp = endp = ignore_bts;
+	while (len > 0) {
+		uintptr_t frame;
+		char *delim;
+		uint32_t range;
+
+		if (!(endp = strchr(endp, ',')))
+			endp = lastp + len;
+
+		len -= (endp - lastp);
+
+		strncpy(buf, lastp, (endp - lastp));
+		delim = strchr(buf, ':');
+		lastp = ++endp;
+		if (!delim)
+			continue;
+		*delim = '\0';
+		delim++;
+		frame = (uintptr_t) dlsym(RTLD_NEXT, buf);
+		range = atoi(delim);
+
+		if (!frame) {
+			debug("\n Could not find dlsym() for '%s'", buf);
+			continue;
+		}
+
+		debug("\n Ignoring '%s' frame 0x%08x range %u", buf, frame, range);
+		ignore_backtrace_push(frame, range);
+	}
+	debug("\n");
+}
+
 /* Processes that support ocheck should implement theses
    hooks so this lib can override them and do init + fini
  */
@@ -274,6 +326,8 @@ static __attribute__((constructor(101))) void ocheck_init()
 	debug("Initializing libocheck.so for %s.%u... ", proc_name, pid);
 
 	initialize_sock();
+
+	parse_ignore_backtraces();
 
 	/* if max_flush_counter <= 0 then flush only on ocheck_fini() */
 	if ((s = getenv("FLUSH_COUNT")))

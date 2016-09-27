@@ -4,10 +4,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "backtraces.h"
 
 extern bool lib_inited;
 
-void backtraces(uintptr_t *frames, uint32_t max_frames);
 void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *frames);
 void remove_message(enum msg_type type, uint32_t id);
 
@@ -29,8 +29,8 @@ void remove_message(enum msg_type type, uint32_t id);
 #define PUSH_MSG(type, ptr, size) \
 	if (lib_inited) {\
 		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
-		backtraces(frames, ARRAY_SIZE(frames)); \
-		store_message(type, (uintptr_t)ptr, size, frames); \
+		if (backtraces(frames, ARRAY_SIZE(frames))) \
+			store_message(type, (uintptr_t)ptr, size, frames); \
 	}
 
 #endif
