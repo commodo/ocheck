@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+static int (*real_socket)(int domain, int type, int protocol);
 static int (*real_open)(const char *filename, int flags, ...);
 static int (*real_close)(int fd);
 static FILE* (*real_fdopen)(int filedes, const char *mode);
@@ -18,12 +19,13 @@ static void initialize()
 		return;
 	}
 
+	real_socket = dlsym(RTLD_NEXT, "socket");
 	real_open = dlsym(RTLD_NEXT, "open");
 	real_close = dlsym(RTLD_NEXT, "close");
 	real_fdopen = dlsym(RTLD_NEXT, "fdopen");
 
 	if ((real_open == NULL) || (real_close == NULL) || 
-	    (real_fdopen == NULL)) {
+	    (real_fdopen == NULL) || (real_socket == NULL)) {
 		debug_exit("Error in `dlsym`: %s\n", dlerror());
 	}
 
@@ -49,6 +51,15 @@ FILE *fdopen(int filedes, const char *mode)
 	*/
 	remove_message_by_fd(FILES, filedes);
 	return result;
+}
+
+int socket(int domain, int type, int protocol)
+{
+	int sock;
+	START_CALL();
+	sock = real_socket(domain, type, protocol);
+	END_CALL(NULL, sock);
+	return sock;
 }
 
 int open(const char *filename, int flags, ...)
