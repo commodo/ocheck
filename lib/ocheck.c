@@ -19,7 +19,7 @@
 #define DEFAULT_MAX_FLUSH_COUNTER	512
 static uint32_t max_flush_counter = DEFAULT_MAX_FLUSH_COUNTER;
 static int fd = -1;
-static struct call_msg messages[32 * 1024] = {0};
+static struct call_msg messages[512 * 1024] = {0};
 static int flush_counter = -1;
 static pid_t pid = -1;
 
