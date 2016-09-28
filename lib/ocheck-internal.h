@@ -11,6 +11,7 @@ extern bool lib_inited;
 void store_message(enum msg_type type, uintptr_t ptr, int fd, size_t size, uintptr_t *frames);
 void remove_message_by_ptr(enum msg_type type, uintptr_t ptr);
 void remove_message_by_fd(enum msg_type type, int fd);
+void update_message_ptr_by_fd(enum msg_type type, uintptr_t ptr, int fd);
 
 #define debug(...) { \
 	FILE *fp = fopen("/tmp/ocheck.out", "ab"); \

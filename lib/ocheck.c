@@ -236,6 +236,15 @@ void remove_message_by_fd(enum msg_type type, int fd)
 	call_msg_invalidate(call_msg_find_by_fd(type, fd));
 }
 
+void update_message_ptr_by_fd(enum msg_type type, uintptr_t ptr, int fd)
+{
+	struct call_msg *msg;
+	if (fd < 0)
+		return;
+	if ((msg = call_msg_find_by_fd(type, fd)))
+		msg->ptr = ptr;
+}
+
 static const char *progname(int pid)
 {
 	FILE *proc;

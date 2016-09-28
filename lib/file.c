@@ -6,10 +6,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
-static FILE* (*real_fopen)(const char*, const char*);
-static int (*real_fclose)(FILE*);
 static int (*real_open)(const char *filename, int flags, ...);
 static int (*real_close)(int fd);
+static FILE* (*real_fdopen)(int filedes, const char *mode);
 
 static void initialize()
 {
@@ -19,13 +18,12 @@ static void initialize()
 		return;
 	}
 
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
-	real_fclose = dlsym(RTLD_NEXT, "fclose");
 	real_open = dlsym(RTLD_NEXT, "open");
 	real_close = dlsym(RTLD_NEXT, "close");
+	real_fdopen = dlsym(RTLD_NEXT, "fdopen");
 
-	if ((real_fopen == NULL) || (real_fclose == NULL)
-		|| (real_open == NULL) || (real_close == NULL)) {
+	if ((real_open == NULL) || (real_close == NULL) || 
+	    (real_fdopen == NULL)) {
 		debug_exit("Error in `dlsym`: %s\n", dlerror());
 	}
 
@@ -38,21 +36,18 @@ static void initialize()
 #define END_CALL(ptr, fd) \
 	PUSH_MSG(FILES, ptr, fd, 0)
 
-FILE* fopen(const char* filename, const char* mode)
+FILE *fdopen(int filedes, const char *mode)
 {
-	FILE* fd = NULL;
+	FILE *result;
 	START_CALL();
-	fd = real_fopen(filename, mode);
-	END_CALL(fd, -1);
-	return fd;
-}
-
-int fclose(FILE* fd)
-{
-	int result = EOF;
-	START_CALL();
-	result = real_fclose(fd);
-	remove_message_by_ptr(FILES, (uintptr_t)fd);
+	result = real_fdopen(filedes, mode);
+	/* This is a bit weird, I know ; but if you think about it,
+	   fopen() & fclose() are also handled by malloc() + free().
+	   So, no need to also track them here.
+	   Here, we only need to care about FDs ; so, technically,
+	   fdopen() would do an alloc(), which should be free'd.
+	*/
+	remove_message_by_fd(FILES, filedes);
 	return result;
 }
 
