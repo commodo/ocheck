@@ -5,6 +5,22 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
+/* This gist of 'ignore_bt' here, is that some functions in some libraries
+   (like libc) do allocs which are never explicitly free'd.
+   That's rude (and annoying)... well, I am annoyed (to be more specific).
+   So, the fix is to add some basic mechanism for ignoring some functions
+   that do allocs, which are known to be safe (to be ignored).
+*/
+
+struct ignore_bt {
+	uintptr_t frame_start;
+	uintptr_t frame_end;
+};
+
+/* 512 entries should be enough for now */
+static struct ignore_bt g_ignore_bt[512];
+static uint32_t g_ignore_bt_cnt = 0;
+
 static uint32_t g_max_backtraces = 0;
 void backtraces_set_max_backtraces(uint32_t max_backtraces)
 {
@@ -20,6 +36,7 @@ uintptr_t ocheck_guard_frame = 0;
 enum BT_RESULT {
 	BT_DONE,
 	BT_HAVE_MORE,
+	BT_IGNORE,
 };
 
 /*
@@ -31,7 +48,13 @@ enum BT_RESULT {
 #define backtraces_(N) \
 	static enum BT_RESULT backtraces_##N(uintptr_t *frames) \
 	{ \
+		int i; \
 		frames[N] = (uintptr_t) __builtin_return_address(N); \
+		for (i = 0; i < g_ignore_bt_cnt; i++) { \
+			struct ignore_bt *bt = &g_ignore_bt[i]; \
+			if (bt->frame_start < frames[N] && frames[N] < bt->frame_end) \
+				return BT_IGNORE; \
+		} \
 		return (frames[N] != ocheck_guard_frame) ? BT_HAVE_MORE : BT_DONE; \
 	}
 
@@ -75,10 +98,18 @@ static backtraces_func backtraces_funcs[] = {
 };
 
 /* https://gcc.gnu.org/bugzilla/show_bug.cgi?id=8743 */
-void backtraces(uintptr_t *frames, uint32_t max_frames)
+bool backtraces(uintptr_t *frames, uint32_t max_frames)
 {
 	int i, res = BT_HAVE_MORE;
 	for (i = 0; i < g_max_backtraces && i < max_frames && backtraces_funcs[i] && res == BT_HAVE_MORE; i++)
 		res = backtraces_funcs[i](frames);
+	return (res != BT_IGNORE);
+}
+
+void ignore_backtrace_push(uintptr_t frame, uint32_t range)
+{
+	struct ignore_bt *bt = &g_ignore_bt[g_ignore_bt_cnt++];
+	bt->frame_start = frame;
+	bt->frame_end = frame + range;
 }
 

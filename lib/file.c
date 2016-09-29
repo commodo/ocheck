@@ -6,10 +6,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-static FILE* (*real_fopen)(const char*, const char*);
-static int (*real_fclose)(FILE*);
+static int (*real_socket)(int domain, int type, int protocol);
 static int (*real_open)(const char *filename, int flags, ...);
 static int (*real_close)(int fd);
+static FILE* (*real_fdopen)(int filedes, const char *mode);
 
 static void initialize()
 {
@@ -19,13 +19,13 @@ static void initialize()
 		return;
 	}
 
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
-	real_fclose = dlsym(RTLD_NEXT, "fclose");
+	real_socket = dlsym(RTLD_NEXT, "socket");
 	real_open = dlsym(RTLD_NEXT, "open");
 	real_close = dlsym(RTLD_NEXT, "close");
+	real_fdopen = dlsym(RTLD_NEXT, "fdopen");
 
-	if ((real_fopen == NULL) || (real_fclose == NULL)
-		|| (real_open == NULL) || (real_close == NULL)) {
+	if ((real_open == NULL) || (real_close == NULL) || 
+	    (real_fdopen == NULL) || (real_socket == NULL)) {
 		debug_exit("Error in `dlsym`: %s\n", dlerror());
 	}
 
@@ -35,25 +35,31 @@ static void initialize()
 #define START_CALL() \
 	initialize();
 
-#define END_CALL(fd) \
-	PUSH_MSG(FILES, fd, 0)
+#define END_CALL(ptr, fd) \
+	PUSH_MSG(FILES, ptr, fd, 0)
 
-FILE* fopen(const char* filename, const char* mode)
+FILE *fdopen(int filedes, const char *mode)
 {
-	FILE* fd = NULL;
+	FILE *result;
 	START_CALL();
-	fd = real_fopen(filename, mode);
-	END_CALL(fd);
-	return fd;
+	result = real_fdopen(filedes, mode);
+	/* This is a bit weird, I know ; but if you think about it,
+	   fopen() & fclose() are also handled by malloc() + free().
+	   So, no need to also track them here.
+	   Here, we only need to care about FDs ; so, technically,
+	   fdopen() would do an alloc(), which should be free'd.
+	*/
+	remove_message_by_fd(FILES, filedes);
+	return result;
 }
 
-int fclose(FILE* fd)
+int socket(int domain, int type, int protocol)
 {
-	int result = EOF;
+	int sock;
 	START_CALL();
-	result = real_fclose(fd);
-	remove_message(FILES, (uintptr_t)fd);
-	return result;
+	sock = real_socket(domain, type, protocol);
+	END_CALL(NULL, sock);
+	return sock;
 }
 
 int open(const char *filename, int flags, ...)
@@ -64,7 +70,7 @@ int open(const char *filename, int flags, ...)
 	va_start(args, flags);
 	fd = real_open(filename, flags, args);
 	va_end(args);
-	END_CALL(fd);
+	END_CALL(NULL, fd);
 	return fd;
 }
 
@@ -73,6 +79,6 @@ int close(int fd)
 	int result = -1;
 	START_CALL();
 	result = real_close(fd);
-	remove_message(FILES, fd);
+	remove_message_by_fd(FILES, fd);
 	return result;
 }

@@ -4,12 +4,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "backtraces.h"
 
 extern bool lib_inited;
 
-void backtraces(uintptr_t *frames, uint32_t max_frames);
-void store_message(enum msg_type type, uintptr_t id, size_t size, uintptr_t *frames);
-void remove_message(enum msg_type type, uint32_t id);
+void store_message(enum msg_type type, uintptr_t ptr, int fd, size_t size, uintptr_t *frames);
+void remove_message_by_ptr(enum msg_type type, uintptr_t ptr);
+void remove_message_by_fd(enum msg_type type, int fd);
+void update_message_ptr_by_fd(enum msg_type type, uintptr_t ptr, int fd);
 
 #define debug(...) { \
 	FILE *fp = fopen("/tmp/ocheck.out", "ab"); \
@@ -26,11 +28,11 @@ void remove_message(enum msg_type type, uint32_t id);
 	exit(1); \
 }
 
-#define PUSH_MSG(type, ptr, size) \
+#define PUSH_MSG(type, ptr, fd, size) \
 	if (lib_inited) {\
 		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
-		backtraces(frames, ARRAY_SIZE(frames)); \
-		store_message(type, (uintptr_t)ptr, size, frames); \
+		if (backtraces(frames, ARRAY_SIZE(frames))) \
+			store_message(type, (uintptr_t)ptr, fd, size, frames); \
 	}
 
 #endif
