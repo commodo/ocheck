@@ -114,7 +114,9 @@ static int write_retry(int fd, uint8_t *buf, uint32_t buf_len)
 static uint32_t flush_messages(bool now)
 {
 	uint32_t i, flushed = 0;
-	struct msg_common clr = { .magic = MSG_MAGIC_NUMBER, .type = CLEAR };
+	uint32_t len, pos = 0;
+	uint8_t send_buf[32 * 1024];
+	struct msg_common *clr_msg;
 
 	/* Not inited, can't flush */
 	if (fd < 0)
@@ -127,17 +129,29 @@ static uint32_t flush_messages(bool now)
 	flush_counter = 999999999;
 
 	curr_flush_state = BUSY;
-	if (write_retry(fd, (uint8_t *) &clr, sizeof(clr)) < 0)
-		debug_exit("Could not send clear message\n");
+	clr_msg = (struct msg_common *) send_buf;
+	clr_msg->magic = MSG_MAGIC_NUMBER;
+	clr_msg->type  = CLEAR;
+	pos += sizeof(struct msg_common);
+	len = sizeof(send_buf);
 
 	for (i = 0; i < ARRAY_SIZE(messages) && curr_flush_state == BUSY; i++) {
-		struct call_msg *msg = &messages[i];
-		if (!msg->ptr && msg->fd < 0)
+		if (messages[i].type == INVALID)
 			continue;
-		if (write_retry(fd, (uint8_t *) msg, sizeof(*msg)) < 0)
-			debug_exit("Could not send message ; errno %d\n", errno);
 		flushed++;
+		memcpy(&send_buf[pos], &messages[i], sizeof(messages[0]));
+		pos += sizeof(messages[0]);
+		len -= sizeof(messages[0]);
+		if (len >= sizeof(messages[0]))
+			continue;
+		if (write_retry(fd, (uint8_t *) send_buf, pos) < 0)
+			debug_exit("Could not send messages\n");
+		pos = 0;
+		len = sizeof(send_buf);
 	}
+
+	if (pos > 0 && write_retry(fd, (uint8_t *) send_buf, pos) < 0)
+		debug_exit("Could not send messages\n");
 	curr_flush_state = IDLE;
 	flush_counter = max_flush_counter;
 	return flushed;
