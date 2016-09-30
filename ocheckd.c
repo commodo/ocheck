@@ -293,7 +293,7 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 	while ((r = read(u->fd, &cl->buf[cl->len], sizeof(cl->buf) - cl->len)) > 0)
 		cl->len += r;
 
-	while (cl->len > 0) {
+	while (cl->len >= sizeof(struct msg_common)) {
 		msg = (struct msg_common *)&cl->buf[msg_pos];
 
 		switch (msg->type) {
@@ -324,6 +324,8 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 		cl->len -= r;
 	}
 
+	if (cl->len > 0)
+		return;
 out:
 	ocheck_client_delete_empty(cl);
 }
