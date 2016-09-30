@@ -70,9 +70,10 @@ void* realloc(void *ptr, size_t size)
 	void *out_ptr;
 	START_CALL();
 	out_ptr = real_realloc(ptr, size);
-	if (ptr != out_ptr)
+	if (ptr != out_ptr) {
 		remove_message_by_ptr(ALLOC, (uintptr_t)ptr);
-	END_CALL(out_ptr, size);
+		END_CALL(out_ptr, size);
+	}
 	return out_ptr;
 }
 
