@@ -53,7 +53,7 @@ static void initialize_sock()
 		debug_exit("Could not open socket\n");
 
 	sock = getenv("SOCK");
-	if (!sock)
+	if (!sock || !strlen(sock))
 		sock = DEFAULT_SOCKET;
 	else if (strlen(sock) >= sizeof(sun.sun_path))
 		debug_exit("Sock path too long\n");
@@ -311,7 +311,7 @@ static const char *is_this_the_right_proc()
 	const char *proc_name = getenv("PROC");
 	const char *actual_proc_name = NULL;
 
-	if (!proc_name)
+	if (!proc_name || !strlen(proc_name))
 		debug_exit("No 'PROC' env var specified\n");
 
 	if (!(actual_proc_name = progname(pid)))
@@ -337,11 +337,10 @@ static void parse_ignore_backtraces()
 	/* no allocs, because "who knows ?" */
 	char buf[64] = "";
 
-	if (!ignore_bts) {
+	if (!ignore_bts || !(len = strlen(ignore_bts))) {
 		debug("\n Ignore list empty\n");
 		return;
 	}
-	len = strlen(ignore_bts);
 
 	lastp = endp = ignore_bts;
 	while (len > 0) {
@@ -411,7 +410,7 @@ static __attribute__((constructor(101))) void ocheck_init()
 	parse_ignore_backtraces();
 
 	/* if max_flush_counter <= 0 then flush only on ocheck_fini() */
-	if ((s = getenv("FLUSH_COUNT")))
+	if ((s = getenv("FLUSH_COUNT")) && strlen(s))
 		max_flush_counter = atoi(s);
 
 	flush_counter = max_flush_counter;
