@@ -18,6 +18,8 @@ struct call_msg_store *get_files_msg_store()
 	return &files_msg_store;
 }
 
+static FILE* (*real_fopen)(const char*, const char*);
+static int (*real_fclose)(FILE*);
 static int (*real_socket)(int domain, int type, int protocol);
 static int (*real_open)(const char *filename, int flags, ...);
 static int (*real_close)(int fd);
@@ -31,12 +33,15 @@ static void initialize()
 		return;
 	}
 
+	real_fopen = dlsym(RTLD_NEXT, "fopen");
+	real_fclose = dlsym(RTLD_NEXT, "fclose");
 	real_socket = dlsym(RTLD_NEXT, "socket");
 	real_open = dlsym(RTLD_NEXT, "open");
 	real_close = dlsym(RTLD_NEXT, "close");
 	real_fdopen = dlsym(RTLD_NEXT, "fdopen");
 
-	if ((real_open == NULL) || (real_close == NULL) || 
+	if ((real_open == NULL) || (real_close == NULL) ||
+	    (real_fopen == NULL) || (real_fclose == NULL) ||
 	    (real_fdopen == NULL) || (real_socket == NULL)) {
 		debug_exit("Error in `dlsym`: %s\n", dlerror());
 	}
@@ -47,12 +52,37 @@ static void initialize()
 #define START_CALL() \
 	initialize();
 
-#define END_CALL(ptr, fd) \
+#define END_CALL_FD(fd) \
 	if (lib_inited) {\
 		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
 		if (backtraces(frames, ARRAY_SIZE(frames))) \
 			store_message_by_fd(&files_msg_store, fd, frames); \
 	}
+
+#define END_CALL_PTR(fp) \
+	if (lib_inited) {\
+		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
+		if (backtraces(frames, ARRAY_SIZE(frames))) \
+			store_message_by_ptr(&files_msg_store, (uintptr_t)fp, 0, frames); \
+	}
+
+FILE* fopen(const char* filename, const char* mode)
+{
+	FILE* fp = NULL;
+	START_CALL();
+	fp = real_fopen(filename, mode);
+	END_CALL_PTR(fp);
+	return fp;
+}
+
+int fclose(FILE* fp)
+{
+	int result;
+	START_CALL();
+	result = real_fclose(fp);
+	remove_message_by_ptr(&files_msg_store, (uintptr_t)fp);
+	return result;
+}
 
 FILE *fdopen(int filedes, const char *mode)
 {
@@ -66,6 +96,7 @@ FILE *fdopen(int filedes, const char *mode)
 	   fdopen() would do an alloc(), which should be free'd.
 	*/
 	remove_message_by_fd(&files_msg_store, filedes);
+	END_CALL_PTR(result);
 	return result;
 }
 
@@ -74,7 +105,7 @@ int socket(int domain, int type, int protocol)
 	int sock;
 	START_CALL();
 	sock = real_socket(domain, type, protocol);
-	END_CALL(NULL, sock);
+	END_CALL_FD(sock);
 	return sock;
 }
 
@@ -86,7 +117,7 @@ int open(const char *filename, int flags, ...)
 	va_start(args, flags);
 	fd = real_open(filename, flags, args);
 	va_end(args);
-	END_CALL(NULL, fd);
+	END_CALL_FD(fd);
 	return fd;
 }
 
