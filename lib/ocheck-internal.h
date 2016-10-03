@@ -8,10 +8,21 @@
 
 extern bool lib_inited;
 
-void store_message(enum msg_type type, uintptr_t ptr, int fd, size_t size, uintptr_t *frames);
-void remove_message_by_ptr(enum msg_type type, uintptr_t ptr);
-void remove_message_by_fd(enum msg_type type, int fd);
-void update_message_ptr_by_fd(enum msg_type type, uintptr_t ptr, int fd);
+struct call_msg_store {
+	enum msg_type type;
+	uint32_t upper_index_limit;
+	uint32_t messages_count;
+	struct call_msg messages[];
+};
+
+void store_message_by_ptr(struct call_msg_store *store, uintptr_t ptr, size_t size, uintptr_t *frames);
+void store_message_by_fd(struct call_msg_store *store, int fd, uintptr_t *frames);
+void remove_message_by_ptr(struct call_msg_store *store, uintptr_t ptr);
+void remove_message_by_fd(struct call_msg_store *store, int fd);
+void update_message_ptr_by_fd(struct call_msg_store *store, uintptr_t ptr, int fd);
+
+struct call_msg_store *get_alloc_msg_store();
+struct call_msg_store *get_files_msg_store();
 
 #define debug(...) { \
 	FILE *fp = fopen("/tmp/ocheck.out", "ab"); \
@@ -27,12 +38,5 @@ void update_message_ptr_by_fd(enum msg_type type, uintptr_t ptr, int fd);
 	debug(__VA_ARGS__); \
 	exit(1); \
 }
-
-#define PUSH_MSG(type, ptr, fd, size) \
-	if (lib_inited) {\
-		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
-		if (backtraces(frames, ARRAY_SIZE(frames))) \
-			store_message(type, (uintptr_t)ptr, fd, size, frames); \
-	}
 
 #endif

@@ -10,6 +10,18 @@
 #include "ocheck.h"
 #include "ocheck-internal.h"
 
+#define ALLOC_MESSAGES_COUNT	(128 * 1024)
+static struct call_msg_store alloc_msg_store = {
+	.type = ALLOC,
+	.messages_count = ALLOC_MESSAGES_COUNT,
+	.messages[ALLOC_MESSAGES_COUNT] = {0},
+};
+
+struct call_msg_store *get_alloc_msg_store()
+{
+	return &alloc_msg_store;
+}
+
 static void* (*real_malloc)(size_t size);
 static void* (*real_calloc)(size_t nmemb, size_t size);
 static void* (*real_realloc)(void *ptr, size_t size);
@@ -45,7 +57,11 @@ static void initialize()
 	initialize();
 
 #define END_CALL(ptr,size) \
-	PUSH_MSG(ALLOC, ptr, -1, size)
+	if (lib_inited) {\
+		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
+		if (backtraces(frames, ARRAY_SIZE(frames))) \
+			store_message_by_ptr(&alloc_msg_store, (uintptr_t)ptr, size, frames); \
+	}
 
 void* malloc(size_t size)
 {
@@ -71,7 +87,7 @@ void* realloc(void *ptr, size_t size)
 	START_CALL();
 	out_ptr = real_realloc(ptr, size);
 	if (ptr != out_ptr) {
-		remove_message_by_ptr(ALLOC, (uintptr_t)ptr);
+		remove_message_by_ptr(&alloc_msg_store, (uintptr_t)ptr);
 		END_CALL(out_ptr, size);
 	}
 	return out_ptr;
@@ -81,7 +97,7 @@ void free(void *ptr)
 {
 	START_CALL();
 	real_free(ptr);
-	remove_message_by_ptr(ALLOC, (uintptr_t)ptr);
+	remove_message_by_ptr(&alloc_msg_store, (uintptr_t)ptr);
 }
 
 void* memalign(size_t blocksize, size_t bytes)
