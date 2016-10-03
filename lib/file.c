@@ -6,6 +6,18 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define FILES_MESSAGES_COUNT	(64 * 1024)
+static struct call_msg_store files_msg_store = {
+	.type = FILES,
+	.messages_count = FILES_MESSAGES_COUNT,
+	.messages[FILES_MESSAGES_COUNT] = {0}
+};
+
+struct call_msg_store *get_files_msg_store()
+{
+	return &files_msg_store;
+}
+
 static int (*real_socket)(int domain, int type, int protocol);
 static int (*real_open)(const char *filename, int flags, ...);
 static int (*real_close)(int fd);
@@ -36,7 +48,11 @@ static void initialize()
 	initialize();
 
 #define END_CALL(ptr, fd) \
-	PUSH_MSG(FILES, ptr, fd, 0)
+	if (lib_inited) {\
+		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
+		if (backtraces(frames, ARRAY_SIZE(frames))) \
+			store_message_by_fd(&files_msg_store, fd, frames); \
+	}
 
 FILE *fdopen(int filedes, const char *mode)
 {
@@ -49,7 +65,7 @@ FILE *fdopen(int filedes, const char *mode)
 	   Here, we only need to care about FDs ; so, technically,
 	   fdopen() would do an alloc(), which should be free'd.
 	*/
-	remove_message_by_fd(FILES, filedes);
+	remove_message_by_fd(&files_msg_store, filedes);
 	return result;
 }
 
@@ -79,6 +95,6 @@ int close(int fd)
 	int result = -1;
 	START_CALL();
 	result = real_close(fd);
-	remove_message_by_fd(FILES, fd);
+	remove_message_by_fd(&files_msg_store, fd);
 	return result;
 }

@@ -19,7 +19,6 @@
 #define DEFAULT_MAX_FLUSH_COUNTER	512
 static uint32_t max_flush_counter = DEFAULT_MAX_FLUSH_COUNTER;
 static int fd = -1;
-static struct call_msg messages[512 * 1024] = {0};
 static int flush_counter = -1;
 static pid_t pid = -1;
 
@@ -111,9 +110,32 @@ static int write_retry(int fd, uint8_t *buf, uint32_t buf_len)
 	return -1;
 }
 
-static uint32_t flush_messages(bool now)
+static uint32_t flush_messages_in_store(struct call_msg_store *store,
+	uint8_t *send_buf, uint32_t *len, uint32_t *pos)
 {
 	uint32_t i, flushed = 0;
+	struct call_msg *messages = store->messages;
+
+	for (i = 0; i < store->upper_index_limit && curr_flush_state == BUSY; i++) {
+		if (messages[i].type == INVALID)
+			continue;
+		flushed++;
+		memcpy(&send_buf[*pos], &messages[i], sizeof(messages[0]));
+		*pos += sizeof(messages[0]);
+		*len -= sizeof(messages[0]);
+		if (*len >= sizeof(messages[0]))
+			continue;
+		if (write_retry(fd, (uint8_t *) send_buf, *pos) < 0)
+			debug_exit("Could not send messages\n");
+		*pos = 0;
+		*len = sizeof(send_buf);
+	}
+	return flushed;
+}
+
+static uint32_t flush_messages(bool now)
+{
+	uint32_t flushed = 0;
 	uint32_t len, pos = 0;
 	uint8_t send_buf[32 * 1024];
 	struct msg_common *clr_msg;
@@ -135,23 +157,12 @@ static uint32_t flush_messages(bool now)
 	pos += sizeof(struct msg_common);
 	len = sizeof(send_buf);
 
-	for (i = 0; i < ARRAY_SIZE(messages) && curr_flush_state == BUSY; i++) {
-		if (messages[i].type == INVALID)
-			continue;
-		flushed++;
-		memcpy(&send_buf[pos], &messages[i], sizeof(messages[0]));
-		pos += sizeof(messages[0]);
-		len -= sizeof(messages[0]);
-		if (len >= sizeof(messages[0]))
-			continue;
-		if (write_retry(fd, (uint8_t *) send_buf, pos) < 0)
-			debug_exit("Could not send messages\n");
-		pos = 0;
-		len = sizeof(send_buf);
-	}
+	flushed += flush_messages_in_store(get_alloc_msg_store(), send_buf, &len, &pos);
+	flushed += flush_messages_in_store(get_files_msg_store(), send_buf, &len, &pos);
 
 	if (pos > 0 && write_retry(fd, (uint8_t *) send_buf, pos) < 0)
 		debug_exit("Could not send messages\n");
+
 	curr_flush_state = IDLE;
 	flush_counter = max_flush_counter;
 	return flushed;
@@ -166,68 +177,57 @@ static inline void call_msg_invalidate(struct call_msg *msg)
 	}
 }
 
-static struct call_msg *call_msg_find_by_ptr(enum msg_type type, uintptr_t ptr)
+static struct call_msg *call_msg_find_by_ptr(struct call_msg_store *store, uintptr_t ptr)
 {
 	int i;
+	struct call_msg *messages;
 	if (!ptr)
 		return NULL;
-	for (i = 0; i < ARRAY_SIZE(messages); i++) {
-		if (messages[i].type == type && messages[i].ptr == ptr)
+	messages = store->messages;
+	for (i = 0; i < store->upper_index_limit; i++) {
+		if (messages[i].ptr == ptr)
 			return &messages[i];
 	}
 	return NULL;
 }
 
-static struct call_msg *call_msg_find_by_fd(enum msg_type type, int fd)
+static struct call_msg *call_msg_find_by_fd(struct call_msg_store *store, int fd)
 {
 	int i;
+	struct call_msg *messages;
 	if (fd < 0)
 		return NULL;
-	for (i = 0; i < ARRAY_SIZE(messages); i++) {
-		if (messages[i].type == type && messages[i].fd == fd)
+	messages = store->messages;
+	for (i = 0; i < store->upper_index_limit; i++) {
+		if (messages[i].fd == fd)
 			return &messages[i];
 	}
 	return NULL;
 }
 
-static inline struct call_msg *call_msg_find(enum msg_type type, uintptr_t ptr, int fd)
+static inline struct call_msg *call_msg_get_free(struct call_msg_store *store)
 {
 	int i;
-	for (i = 0; i < ARRAY_SIZE(messages); i++) {
-		if (messages[i].type != type)
-			continue;
-		if (messages[i].ptr == ptr && messages[i].fd == fd)
-			return &messages[i];
-	}
-	return NULL;
-}
-
-static inline struct call_msg *call_msg_get_free()
-{
-	int i;
-	for (i = 0; i < ARRAY_SIZE(messages); i++) {
+	struct call_msg *messages = store->messages;
+	for (i = 0; i < store->upper_index_limit; i++) {
 		if (messages[i].type == INVALID)
 			return &messages[i];
 	}
+	if (store->upper_index_limit < store->messages_count)
+		return &messages[store->upper_index_limit++];
 	return NULL;
 }
 
-void store_message(enum msg_type type, uintptr_t ptr, int fd, size_t size, uintptr_t *frames)
+static void store_message(struct call_msg_store *store, struct call_msg *msg,
+	uintptr_t ptr, int fd, size_t size, uintptr_t *frames)
 {
-	struct call_msg *msg;
-
-	if (fd < 0 && !ptr)
-		return;
-
-	/* FIXME: see what we do in this case ; this looks like a malfunction ; for now we ignore */
-	if (!(msg = call_msg_find(type, ptr, fd))) {
-		msg = call_msg_get_free();
-		if (!msg)
-			debug_exit("No more room to store calls\n");
-	}
+	if (!msg)
+		msg = call_msg_get_free(store);
+	if (!msg)
+		debug_exit("No more room to store calls\n");
 
 	msg->magic = MSG_MAGIC_NUMBER;
-	msg->type  = type;
+	msg->type  = store->type;
 	msg->tid   = ourgettid();
 	msg->ptr   = ptr;
 	msg->fd    = fd;
@@ -240,22 +240,40 @@ void store_message(enum msg_type type, uintptr_t ptr, int fd, size_t size, uintp
 	flush_messages(false);
 }
 
-void remove_message_by_ptr(enum msg_type type, uintptr_t ptr)
+void store_message_by_ptr(struct call_msg_store *store, uintptr_t ptr, size_t size, uintptr_t *frames)
 {
-	call_msg_invalidate(call_msg_find_by_ptr(type, ptr));
+	struct call_msg *msg;
+	if (!ptr)
+		return;
+	msg = call_msg_find_by_ptr(store, ptr);
+	store_message(store, msg, ptr, -1, size, frames);
 }
 
-void remove_message_by_fd(enum msg_type type, int fd)
-{
-	call_msg_invalidate(call_msg_find_by_fd(type, fd));
-}
-
-void update_message_ptr_by_fd(enum msg_type type, uintptr_t ptr, int fd)
+void store_message_by_fd(struct call_msg_store *store, int fd, uintptr_t *frames)
 {
 	struct call_msg *msg;
 	if (fd < 0)
 		return;
-	if ((msg = call_msg_find_by_fd(type, fd)))
+	msg = call_msg_find_by_fd(store, fd);
+	store_message(store, msg, 0, fd, 0, frames);
+}
+
+void remove_message_by_ptr(struct call_msg_store *store, uintptr_t ptr)
+{
+	call_msg_invalidate(call_msg_find_by_ptr(store, ptr));
+}
+
+void remove_message_by_fd(struct call_msg_store *store, int fd)
+{
+	call_msg_invalidate(call_msg_find_by_fd(store, fd));
+}
+
+void update_message_ptr_by_fd(struct call_msg_store *store, uintptr_t ptr, int fd)
+{
+	struct call_msg *msg;
+	if (fd < 0)
+		return;
+	if ((msg = call_msg_find_by_fd(store, fd)))
 		msg->ptr = ptr;
 }
 
@@ -357,6 +375,13 @@ static void parse_ignore_backtraces()
 	debug("\n");
 }
 
+static void ocheck_init_store(struct call_msg_store *store)
+{
+	int i;
+	for (i = 0; i < store->messages_count; i++)
+		store->messages[i].fd = -1;
+}
+
 /* Processes that support ocheck should implement theses
    hooks so this lib can override them and do init + fini
  */
@@ -366,7 +391,6 @@ static __attribute__((constructor(101))) void ocheck_init()
 	struct proc_msg msg;
 	const char *proc_name;
 	const char *s;
-	int i;
 
 	/* Do not re-initialize if already initialized and it's the same pid */
 	if (lib_inited && (pid == ourgetpid()))
@@ -390,9 +414,8 @@ static __attribute__((constructor(101))) void ocheck_init()
 	if ((s = getenv("FLUSH_COUNT")))
 		max_flush_counter = atoi(s);
 
-	/* Initialize fd to negative */
-	for (i = 0; i < ARRAY_SIZE(messages); i++)
-		messages[i].fd = -1;
+	ocheck_init_store(get_alloc_msg_store());
+	ocheck_init_store(get_files_msg_store());
 
 	/* We won't get here, since initialize_sock() calls exit(1) in case something does not init  */
 	msg.magic = MSG_MAGIC_NUMBER;
