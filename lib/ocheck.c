@@ -337,7 +337,7 @@ static void parse_ignore_backtraces()
 	char buf[64] = "";
 
 	if (!ignore_bts || !(len = strlen(ignore_bts))) {
-		debug("\n Ignore list empty\n");
+		debug("\n  Ignore list empty\n");
 		return;
 	}
 
@@ -363,11 +363,11 @@ static void parse_ignore_backtraces()
 		range = atoi(delim);
 
 		if (!frame) {
-			debug("\n Could not find dlsym() for '%s'", buf);
+			debug("\n  Could not find dlsym() for '%s'", buf);
 			continue;
 		}
 
-		debug("\n Ignoring '%s' frame 0x%08x range %u", buf, frame, range);
+		debug("\n  Ignoring '%s' frame 0x%08x range %u", buf, frame, range);
 		ignore_backtrace_push(frame, range);
 	}
 	debug("\n");
