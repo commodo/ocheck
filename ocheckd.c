@@ -172,6 +172,9 @@ static void ocheck_client_list_clear(const char *name)
 			continue;
 		list_del(&cl->list);
 		ocheck_client_calls_clear_list(cl);
+		uloop_fd_delete(&cl->sock);
+		if (cl->sock.fd > -1)
+			close(cl->sock.fd);
 		free(cl);
 	}
 }
