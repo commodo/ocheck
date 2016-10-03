@@ -81,7 +81,7 @@ static void ocheckd_connect_handler(struct ubus_context *ctx)
 	ubus_add_object(ctx, &ocheckd_object);
 }
 
-static void ocheckd_populate_list(struct list_head *lst,
+static uint32_t ocheckd_populate_list(struct list_head *lst,
 	const char *name,
 	enum msg_type type)
 {
@@ -122,6 +122,7 @@ static void ocheckd_populate_list(struct list_head *lst,
 	blobmsg_close_array(&b, elems);
 	blobmsg_add_u32(&b, "count", call_count);
 	blobmsg_close_table(&b, a);
+	return call_count;
 }
 
 static int ocheckd_list_handler(struct ubus_context *ctx,
@@ -131,15 +132,17 @@ static int ocheckd_list_handler(struct ubus_context *ctx,
 	struct blob_attr *msg)
 {
 	struct ocheck_client *cl, *tmp;
+	uint32_t total = 0;
 
 	blob_buf_init(&b, 0);
 
 	list_for_each_entry_safe(cl, tmp, &ocheck_client_list, list) {
 		void *p = blobmsg_open_table(&b, cl->proc);
-		ocheckd_populate_list(&cl->calls, "allocs", ALLOC);
-		ocheckd_populate_list(&cl->calls, "files", FILES);
+		total += ocheckd_populate_list(&cl->calls, "allocs", ALLOC);
+		total += ocheckd_populate_list(&cl->calls, "files", FILES);
 		blobmsg_close_table(&b, p);
 	}
+	blobmsg_add_u32(&b, "total", total);
 
 	ubus_send_reply(ctx, req, b.head);
 	return 0;
@@ -169,6 +172,9 @@ static void ocheck_client_list_clear(const char *name)
 			continue;
 		list_del(&cl->list);
 		ocheck_client_calls_clear_list(cl);
+		uloop_fd_delete(&cl->sock);
+		if (cl->sock.fd > -1)
+			close(cl->sock.fd);
 		free(cl);
 	}
 }
@@ -290,7 +296,7 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 	while ((r = read(u->fd, &cl->buf[cl->len], sizeof(cl->buf) - cl->len)) > 0)
 		cl->len += r;
 
-	while (cl->len > 0) {
+	while (cl->len >= sizeof(struct msg_common)) {
 		msg = (struct msg_common *)&cl->buf[msg_pos];
 
 		switch (msg->type) {
@@ -321,6 +327,8 @@ static void client_cb(struct uloop_fd *u, unsigned int events)
 		cl->len -= r;
 	}
 
+	if (cl->len > 0)
+		return;
 out:
 	ocheck_client_delete_empty(cl);
 }
