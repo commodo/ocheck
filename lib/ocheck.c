@@ -16,8 +16,7 @@
 #include "ocheck.h"
 #include "ocheck-internal.h"
 
-#define DEFAULT_MAX_FLUSH_COUNTER	512
-static uint32_t max_flush_counter = DEFAULT_MAX_FLUSH_COUNTER;
+static uint32_t max_flush_counter = 0;
 static int fd = -1;
 static int flush_counter = -1;
 static pid_t pid = -1;
