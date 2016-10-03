@@ -414,6 +414,9 @@ static __attribute__((constructor(101))) void ocheck_init()
 	if ((s = getenv("FLUSH_COUNT")))
 		max_flush_counter = atoi(s);
 
+	flush_counter = max_flush_counter;
+	debug("  Flush counter %u\n", flush_counter);
+
 	ocheck_init_store(get_alloc_msg_store());
 	ocheck_init_store(get_files_msg_store());
 
