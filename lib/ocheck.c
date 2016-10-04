@@ -15,6 +15,7 @@
 
 #include "ocheck.h"
 #include "ocheck-internal.h"
+#include "frame_size.h"
 
 static uint32_t max_flush_counter = 0;
 static int fd = -1;
@@ -367,7 +368,7 @@ static void parse_ignore_backtraces()
 			continue;
 		}
 
-		debug("\n  Ignoring '%s' frame 0x%08x range %u", buf, frame, range);
+		debug("\n  Ignoring '%s' frame 0x%"PRIxPTR_PAD" range %u", buf, frame, range);
 		ignore_backtrace_push(frame, range);
 	}
 	debug("\n");
