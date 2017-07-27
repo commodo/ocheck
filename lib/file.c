@@ -18,12 +18,24 @@ struct call_msg_store *get_files_msg_store()
 	return &files_msg_store;
 }
 
-static FILE* (*real_fopen)(const char*, const char*);
-static int (*real_fclose)(FILE*);
+FILE* (*real_fopen)(const char*, const char*);
+int (*real_fclose)(FILE*);
+int (*real_fprintf)(FILE *, const char *, ... );
+
 static int (*real_socket)(int domain, int type, int protocol);
 static int (*real_open)(const char *filename, int flags, ...);
 static int (*real_close)(int fd);
 static FILE* (*real_fdopen)(int filedes, const char *mode);
+
+void initialize_file_hooks_for_debug()
+{
+	real_fopen = dlsym(RTLD_NEXT, "fopen");
+	real_fclose = dlsym(RTLD_NEXT, "fclose");
+	real_fprintf = dlsym(RTLD_NEXT, "fprintf");
+
+	if (!real_fopen || !real_fclose || !real_fprintf)
+		exit(1);
+}
 
 static void initialize()
 {
@@ -33,15 +45,12 @@ static void initialize()
 		return;
 	}
 
-	real_fopen = dlsym(RTLD_NEXT, "fopen");
-	real_fclose = dlsym(RTLD_NEXT, "fclose");
 	real_socket = dlsym(RTLD_NEXT, "socket");
 	real_open = dlsym(RTLD_NEXT, "open");
 	real_close = dlsym(RTLD_NEXT, "close");
 	real_fdopen = dlsym(RTLD_NEXT, "fdopen");
 
 	if ((real_open == NULL) || (real_close == NULL) ||
-	    (real_fopen == NULL) || (real_fclose == NULL) ||
 	    (real_fdopen == NULL) || (real_socket == NULL)) {
 		debug_exit("Error in `dlsym`: %s\n", dlerror());
 	}

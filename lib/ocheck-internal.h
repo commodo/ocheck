@@ -24,13 +24,19 @@ void update_message_ptr_by_fd(struct call_msg_store *store, uintptr_t ptr, int f
 struct call_msg_store *get_alloc_msg_store();
 struct call_msg_store *get_files_msg_store();
 
+extern FILE* (*real_fopen)(const char*, const char*);
+extern int (*real_fclose)(FILE*);
+extern int (*real_fprintf)(FILE *, const char *, ... );
+
+void initialize_file_hooks_for_debug();
+
 #define debug(...) { \
-	FILE *fp = fopen("/tmp/ocheck.out", "ab"); \
+	FILE *fp = real_fopen("/tmp/ocheck.out", "ab"); \
 	if (fp) { \
-		fprintf(fp, __VA_ARGS__); \
-		fclose(fp); \
+		real_fprintf(fp, __VA_ARGS__); \
+		real_fclose(fp); \
 	} \
-	fprintf(stderr, __VA_ARGS__); \
+	real_fprintf(stderr, __VA_ARGS__); \
 }
 
 /* In case we exit because of some failure */

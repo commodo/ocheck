@@ -289,13 +289,13 @@ static const char *progname(int pid)
 
 	snprintf(file, sizeof(file), "/proc/%u/cmdline", pid);
 
-	if (!(proc = fopen(file, "r")) ||
+	if (!(proc = real_fopen(file, "r")) ||
 	    !(a = fread(file, 1, sizeof(file), proc))) {
 		if (proc)
-			fclose(proc);
+			real_fclose(proc);
 		return NULL;
 	}
-	fclose(proc);
+	real_fclose(proc);
 
 	if ((c = strrchr(file, '/')))
 		c++;
@@ -395,12 +395,15 @@ static __attribute__((constructor(101))) void ocheck_init()
 	if (lib_inited && (pid == ourgetpid()))
 		return;
 
+	initialize_file_hooks_for_debug();
+
 	backtraces_set_max_backtraces(0);
 	pid = ourgetpid();
 	if (pid < 0)
 		debug_exit("Could not get pid\n");
 	if (!(proc_name = is_this_the_right_proc()))
 		return;
+
 	unlink("/tmp/ocheck.out");
 
 	debug("Initializing libocheck.so for %s.%u...\n", proc_name, pid);
