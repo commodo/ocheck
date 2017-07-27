@@ -338,7 +338,7 @@ static void parse_ignore_backtraces()
 	char buf[64] = "";
 
 	if (!ignore_bts || !(len = strlen(ignore_bts))) {
-		debug("\n  Ignore list empty\n");
+		debug("  Ignore list empty\n");
 		return;
 	}
 
@@ -368,7 +368,7 @@ static void parse_ignore_backtraces()
 			continue;
 		}
 
-		debug("\n  Ignoring '%s' frame 0x%"PRIxPTR_PAD" range %u", buf, frame, range);
+		debug("  Ignoring '%s' frame 0x%"PRIxPTR_PAD" range %u", buf, frame, range);
 		ignore_backtrace_push(frame, range);
 	}
 	debug("\n");
@@ -403,7 +403,7 @@ static __attribute__((constructor(101))) void ocheck_init()
 		return;
 	unlink("/tmp/ocheck.out");
 
-	debug("Initializing libocheck.so for %s.%u... ", proc_name, pid);
+	debug("Initializing libocheck.so for %s.%u...\n", proc_name, pid);
 
 	initialize_sock();
 
