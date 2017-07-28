@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "backtraces.h"
 
 extern bool lib_inited;
 

@@ -9,7 +9,6 @@ ocheckd_OBJS:= \
 
 libocheck_OBJS:= \
 	lib/ocheck.o \
-	lib/backtraces.o \
 	lib/allocs.o \
 	lib/file.o
 

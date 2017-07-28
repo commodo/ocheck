@@ -323,57 +323,6 @@ static const char *is_this_the_right_proc()
 	return proc_name;
 }
 
-/* Ah, parsing in C (and with no allocs), such a "joy" ; look mom, no hands */
-static void parse_ignore_backtraces()
-{
-	/* Note: functions can be provided as 'IGNORE_BT=func1:300,func2:400'
-	   So, each pair is separated by a comma and is a tuple of
-	   function name + an arbitrary offset (in decimal).
-	   Only functions that are exported will work (usually).
-	*/
-	const char *ignore_bts = getenv("IGNORE_BT");
-	int len;
-	const char *endp, *lastp;
-	/* no allocs, because "who knows ?" */
-	char buf[64] = "";
-
-	if (!ignore_bts || !(len = strlen(ignore_bts))) {
-		debug("  Ignore list empty\n");
-		return;
-	}
-
-	lastp = endp = ignore_bts;
-	while (len > 0) {
-		uintptr_t frame;
-		char *delim;
-		uint32_t range;
-
-		if (!(endp = strchr(endp, ',')))
-			endp = lastp + len;
-
-		len -= (endp - lastp);
-
-		strncpy(buf, lastp, (endp - lastp));
-		delim = strchr(buf, ':');
-		lastp = ++endp;
-		if (!delim)
-			continue;
-		*delim = '\0';
-		delim++;
-		frame = (uintptr_t) dlsym(RTLD_NEXT, buf);
-		range = atoi(delim);
-
-		if (!frame) {
-			debug("\n  Could not find dlsym() for '%s'", buf);
-			continue;
-		}
-
-		debug("  Ignoring '%s' frame 0x%"PRIxPTR_PAD" range %u", buf, frame, range);
-		ignore_backtrace_push(frame, range);
-	}
-	debug("\n");
-}
-
 static void ocheck_init_store(struct call_msg_store *store)
 {
 	int i;
@@ -397,7 +346,6 @@ static __attribute__((constructor(101))) void ocheck_init()
 
 	initialize_file_hooks_for_debug();
 
-	backtraces_set_max_backtraces(0);
 	pid = ourgetpid();
 	if (pid < 0)
 		debug_exit("Could not get pid\n");
@@ -409,8 +357,6 @@ static __attribute__((constructor(101))) void ocheck_init()
 	debug("Initializing libocheck.so for %s.%u...\n", proc_name, pid);
 
 	initialize_sock();
-
-	parse_ignore_backtraces();
 
 	/* if max_flush_counter <= 0 then flush only on ocheck_fini() */
 	if ((s = getenv("FLUSH_COUNT")) && strlen(s))
@@ -430,7 +376,6 @@ static __attribute__((constructor(101))) void ocheck_init()
 
 	debug("done\n");
 	lib_inited = true;
-	backtraces_set_max_backtraces(BACK_FRAMES_COUNT);
 }
 
 static __attribute__((destructor(101))) void ocheck_fini()
@@ -442,7 +387,6 @@ static __attribute__((destructor(101))) void ocheck_fini()
 	if (!lib_inited || pid != ourgetpid())
 		return;
 
-	backtraces_set_max_backtraces(0);
 	if (!(proc_name = is_this_the_right_proc()))
 		goto out;
 

@@ -61,19 +61,8 @@ static void initialize()
 #define START_CALL() \
 	initialize();
 
-#define END_CALL_FD(fd) \
-	if (lib_inited) {\
-		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
-		if (backtraces(frames, ARRAY_SIZE(frames))) \
-			store_message_by_fd(&files_msg_store, fd, frames); \
-	}
-
-#define END_CALL_PTR(fp) \
-	if (lib_inited) {\
-		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
-		if (backtraces(frames, ARRAY_SIZE(frames))) \
-			store_message_by_ptr(&files_msg_store, (uintptr_t)fp, 0, frames); \
-	}
+#define END_CALL_FD(fd)
+#define END_CALL_PTR(fp)
 
 FILE* fopen(const char* filename, const char* mode)
 {

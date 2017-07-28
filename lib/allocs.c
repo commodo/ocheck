@@ -6,7 +6,6 @@
 #include <string.h>
 #include <errno.h>
 
-#include "backtraces.h"
 #include "ocheck.h"
 #include "ocheck-internal.h"
 
@@ -56,12 +55,7 @@ static void initialize()
 #define START_CALL() \
 	initialize();
 
-#define END_CALL(ptr,size) \
-	if (lib_inited) {\
-		uintptr_t frames[BACK_FRAMES_COUNT] = {0}; \
-		if (backtraces(frames, ARRAY_SIZE(frames))) \
-			store_message_by_ptr(&alloc_msg_store, (uintptr_t)ptr, size, frames); \
-	}
+#define END_CALL(ptr,size)
 
 void* malloc(size_t size)
 {
