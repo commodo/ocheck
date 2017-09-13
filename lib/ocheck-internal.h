@@ -14,8 +14,8 @@ struct call_msg_store {
 	struct call_msg messages[];
 };
 
-void store_message_by_ptr(struct call_msg_store *store, uintptr_t ptr, size_t size, uintptr_t *frames);
-void store_message_by_fd(struct call_msg_store *store, int fd, uintptr_t *frames);
+void store_message_by_ptr(struct call_msg_store *store, uintptr_t ptr, size_t size);
+void store_message_by_fd(struct call_msg_store *store, int fd);
 void remove_message_by_ptr(struct call_msg_store *store, uintptr_t ptr);
 void remove_message_by_fd(struct call_msg_store *store, int fd);
 void update_message_ptr_by_fd(struct call_msg_store *store, uintptr_t ptr, int fd);

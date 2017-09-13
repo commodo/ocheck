@@ -128,7 +128,7 @@ static inline struct call_msg *call_msg_get_free(struct call_msg_store *store)
 }
 
 static void store_message(struct call_msg_store *store, struct call_msg *msg,
-	uintptr_t ptr, int fd, size_t size, uintptr_t *frames)
+	uintptr_t ptr, int fd, size_t size)
 {
 	if (!msg)
 		msg = call_msg_get_free(store);
@@ -141,25 +141,24 @@ static void store_message(struct call_msg_store *store, struct call_msg *msg,
 	msg->ptr   = ptr;
 	msg->fd    = fd;
 	msg->size  = size; 
-	memcpy(msg->frames, frames, sizeof(msg->frames));
 }
 
-void store_message_by_ptr(struct call_msg_store *store, uintptr_t ptr, size_t size, uintptr_t *frames)
+void store_message_by_ptr(struct call_msg_store *store, uintptr_t ptr, size_t size)
 {
 	struct call_msg *msg;
 	if (!ptr)
 		return;
 	msg = call_msg_find_by_ptr(store, ptr);
-	store_message(store, msg, ptr, -1, size, frames);
+	store_message(store, msg, ptr, -1, size);
 }
 
-void store_message_by_fd(struct call_msg_store *store, int fd, uintptr_t *frames)
+void store_message_by_fd(struct call_msg_store *store, int fd)
 {
 	struct call_msg *msg;
 	if (fd < 0)
 		return;
 	msg = call_msg_find_by_fd(store, fd);
-	store_message(store, msg, 0, fd, 0, frames);
+	store_message(store, msg, 0, fd, 0);
 }
 
 void remove_message_by_ptr(struct call_msg_store *store, uintptr_t ptr)
