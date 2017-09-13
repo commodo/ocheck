@@ -40,6 +40,7 @@ static uint32_t flush_messages_in_store(struct call_msg_store *store, FILE *fp, 
 	struct call_msg *messages = store->messages;
 
 	real_fprintf(fp, "\t\"%s\": {\n", name);
+	real_fprintf(fp, "\t\t\"total_count\": %u,\n", store->total_count);
 
 	for (i = 0; i < store->upper_index_limit; i++) {
 		if (messages[i].type == INVALID)
@@ -130,6 +131,7 @@ static inline struct call_msg *call_msg_get_free(struct call_msg_store *store)
 static void store_message(struct call_msg_store *store, struct call_msg *msg,
 	uintptr_t ptr, int fd, size_t size)
 {
+	store->total_count++;
 	if (!msg)
 		msg = call_msg_get_free(store);
 	if (!msg)
