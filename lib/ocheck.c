@@ -42,15 +42,20 @@ static uint32_t flush_messages_in_store(struct call_msg_store *store, FILE *fp, 
 	real_fprintf(fp, "\t\"%s\": {\n", name);
 	real_fprintf(fp, "\t\t\"total_count\": %u,\n", store->total_count);
 	real_fprintf(fp, "\t\t\"max_store_expansion\": %u,\n", store->max_store_expansion);
-	real_fprintf(fp, "\t\t\"capacity\": %u,\n", store->capacity);
+	real_fprintf(fp, "\t\t\"capacity\": %u", store->capacity);
 
 	for (i = 0; i < store->max_store_expansion; i++) {
 		if (messages[i].type == INVALID)
 			continue;
-		real_fprintf(fp, "\t\t\"ptr\" : \"0x%"PRIxPTR_PAD "\"\n", messages[i].ptr);
-		real_fprintf(fp, "\t\t\"ptr_size\" : %u\n", messages[i].size);
-		real_fprintf(fp, "\t\t\"fd\" : %d\n", messages[i].fd);
+		real_fprintf(fp, ",\n\t\t\"leak%u\": {\n", flushed);
+		real_fprintf(fp, "\t\t\t\"ptr\" : \"0x%"PRIxPTR_PAD "\",\n", messages[i].ptr);
+		real_fprintf(fp, "\t\t\t\"ptr_size\" : %u,\n", messages[i].size);
+		real_fprintf(fp, "\t\t\t\"fd\" : %d\n", messages[i].fd);
+		real_fprintf(fp, "\t\t}");
+		flushed++;
 	}
+
+	real_fprintf(fp, ",\n\t\t\"leaks\": %u\n", flushed);
 
 	real_fprintf(fp, "\t}");
 
