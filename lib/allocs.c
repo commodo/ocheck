@@ -55,7 +55,8 @@ static void initialize()
 #define START_CALL() \
 	initialize();
 
-#define END_CALL(ptr,size)
+#define END_CALL(ptr,size) \
+	store_message_by_ptr(&alloc_msg_store, (uintptr_t)ptr, size);
 
 void* malloc(size_t size)
 {

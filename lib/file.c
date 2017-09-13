@@ -61,8 +61,11 @@ static void initialize()
 #define START_CALL() \
 	initialize();
 
-#define END_CALL_FD(fd)
-#define END_CALL_PTR(fp)
+#define END_CALL_FD(fd) \
+	store_message_by_fd(&files_msg_store, fd);
+
+#define END_CALL_PTR(fp) \
+	store_message_by_ptr(&files_msg_store, (uintptr_t)fp, 0);
 
 FILE* fopen(const char* filename, const char* mode)
 {
