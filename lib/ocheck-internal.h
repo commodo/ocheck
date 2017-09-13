@@ -29,8 +29,10 @@ extern int (*real_fprintf)(FILE *, const char *, ... );
 
 void initialize_file_hooks_for_debug();
 
+extern const char *debug_fname_out;
+
 #define debug(...) { \
-	FILE *fp = real_fopen("/tmp/ocheck.out", "ab"); \
+	FILE *fp = real_fopen(debug_fname_out, "ab"); \
 	if (fp) { \
 		real_fprintf(fp, __VA_ARGS__); \
 		real_fclose(fp); \

@@ -19,6 +19,9 @@
 
 static pid_t pid = -1;
 
+static const char *leak_fname_out = "/tmp/ocheck.leaks";
+const char *debug_fname_out = "/tmp/ocheck.out";
+
 bool lib_inited = false;
 
 static inline pid_t ourgettid()
@@ -54,10 +57,10 @@ static uint32_t flush_messages_in_store(struct call_msg_store *store, FILE *fp, 
 static void flush_messages()
 {
 	uint32_t flushed = 0;
-	FILE *fp = real_fopen("/tmp/ocheck.leaks", "wb");
+	FILE *fp = real_fopen(leak_fname_out, "wb");
 
 	if (!fp) {
-		debug("  Could not open file '/tmp/ocheck.leaks' for leak dump");
+		debug("  Could not open file '%s' for leak dump", leak_fname_out);
 		exit(1);
 	}
 
@@ -238,6 +241,7 @@ static void ocheck_init_store(struct call_msg_store *store)
 static __attribute__((constructor(101))) void ocheck_init()
 {
 	const char *proc_name;
+	const char *s;
 
 	/* Do not re-initialize if already initialized and it's the same pid */
 	if (lib_inited && (pid == ourgetpid()))
@@ -251,9 +255,15 @@ static __attribute__((constructor(101))) void ocheck_init()
 	if (!(proc_name = is_this_the_right_proc()))
 		return;
 
-	unlink("/tmp/ocheck.out");
+	if ((s = getenv("DEBUG_OUTPUT")) && strlen(s))
+		debug_fname_out = s;
+	if ((s = getenv("LEAKS_OUTPUT")) && strlen(s))
+		leak_fname_out = s;
+
+	unlink(debug_fname_out);
 
 	debug("Initializing libocheck.so for %s.%u...\n", proc_name, pid);
+	debug("Leaks file output: '%s'\n", leak_fname_out);
 
 	ocheck_init_store(get_alloc_msg_store());
 	ocheck_init_store(get_files_msg_store());
