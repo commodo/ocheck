@@ -1,16 +1,7 @@
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
-#include <dlfcn.h>
-#include <poll.h>
-#include <sys/un.h>
-#include <signal.h>
-#include <errno.h>
 #include <string.h>
 
 #include "ocheck.h"

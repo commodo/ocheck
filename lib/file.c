@@ -3,8 +3,6 @@
 #include "ocheck-internal.h"
 #include <stdarg.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
 
 #define FILES_MESSAGES_COUNT	(64 * 1024)
 static struct call_msg_store files_msg_store = {
