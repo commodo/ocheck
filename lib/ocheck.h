@@ -20,18 +20,6 @@ enum msg_type {
 	PROC_NAME = 1,
 	ALLOC,
 	FILES,
-	CLEAR,
-};
-
-struct msg_common {
-	uint32_t magic;
-	uint16_t type;
-};
-
-struct proc_msg {
-	uint32_t magic;
-	uint16_t type;
-	char name[PROC_NAME_LEN];
 };
 
 struct call_msg {

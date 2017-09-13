@@ -17,17 +17,7 @@
 #include "ocheck-internal.h"
 #include "frame_size.h"
 
-static uint32_t max_flush_counter = 0;
-static int fd = -1;
-static int flush_counter = -1;
 static pid_t pid = -1;
-
-enum FLUSH_STATE {
-	IDLE = 0,
-	BUSY,
-	INTERRUPT
-};
-static enum FLUSH_STATE curr_flush_state = IDLE;
 
 bool lib_inited = false;
 
@@ -41,131 +31,47 @@ static inline pid_t ourgetpid()
 	return syscall(SYS_getpid);
 }
 
-static void initialize_sock()
-{
-	const char *sock;
-	struct sockaddr_un sun = {.sun_family = AF_UNIX};
-
-	if (fd > -1)
-		return;
-
-	if (fd < 0 && (fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
-		debug_exit("Could not open socket\n");
-
-	sock = getenv("SOCK");
-	if (!sock || !strlen(sock))
-		sock = DEFAULT_SOCKET;
-	else if (strlen(sock) >= sizeof(sun.sun_path))
-		debug_exit("Sock path too long\n");
-
-	strcpy(sun.sun_path, sock);
-
-	fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | O_NONBLOCK | FD_CLOEXEC);
-
-	if (connect(fd, (struct sockaddr *)&sun, sizeof(sun)) && errno != EINPROGRESS) {
-		close(fd);
-		debug_exit("Could not connect to socket (%d) '%s' errno %d\n", fd, sock, errno);
-	}
-}
-
-/* wait_data() and write_retry() adapted from libubus-io.c */
-static void wait_data(int fd, bool write)
-{
-	struct pollfd pfd = { .fd = fd };
-
-	pfd.events = write ? POLLOUT : POLLIN;
-	poll(&pfd, 1, -1);
-}
-
-static int write_retry(int fd, uint8_t *buf, uint32_t buf_len)
-{
-	int len = 0;
-
-	do {
-		int cur_len;
-
-		cur_len = write(fd, &buf[len], buf_len - len);
-		if (cur_len < 0) {
-			switch(errno) {
-			case EAGAIN:
-				wait_data(fd, true);
-				break;
-			case EINTR:
-				break;
-			default:
-				return -1;
-			}
-			continue;
-		}
-		if (curr_flush_state != BUSY)
-			return 0;
-
-		len += cur_len;
-		if (len == buf_len)
-			return len;
-
-	} while (1);
-
-	/* Should never reach here */
-	return -1;
-}
-
-static uint32_t flush_messages_in_store(struct call_msg_store *store,
-	uint8_t *send_buf, uint32_t *len, uint32_t *pos)
+static uint32_t flush_messages_in_store(struct call_msg_store *store, FILE *fp, const char *name)
 {
 	uint32_t i, flushed = 0;
 	struct call_msg *messages = store->messages;
 
-	for (i = 0; i < store->upper_index_limit && curr_flush_state == BUSY; i++) {
+	real_fprintf(fp, "\t\"%s\": {\n", name);
+
+	for (i = 0; i < store->upper_index_limit; i++) {
 		if (messages[i].type == INVALID)
 			continue;
-		flushed++;
-		memcpy(&send_buf[*pos], &messages[i], sizeof(messages[0]));
-		*pos += sizeof(messages[0]);
-		*len -= sizeof(messages[0]);
-		if (*len >= sizeof(messages[0]))
-			continue;
-		if (write_retry(fd, (uint8_t *) send_buf, *pos) < 0)
-			debug_exit("Could not send messages\n");
-		*pos = 0;
-		*len = sizeof(send_buf);
+		real_fprintf(fp, "\t\t\"ptr\" : \"0x%"PRIxPTR_PAD "\"\n", messages[i].ptr);
+		real_fprintf(fp, "\t\t\"ptr_size\" : %u\n", messages[i].size);
+		real_fprintf(fp, "\t\t\"fd\" : %d\n", messages[i].fd);
 	}
+
+	real_fprintf(fp, "\t}");
+
 	return flushed;
 }
 
-static uint32_t flush_messages(bool now)
+static void flush_messages()
 {
 	uint32_t flushed = 0;
-	uint32_t len, pos = 0;
-	uint8_t send_buf[32 * 1024];
-	struct msg_common *clr_msg;
+	FILE *fp = real_fopen("/tmp/ocheck.leaks", "wb");
 
-	/* Not inited, can't flush */
-	if (fd < 0)
-		return 0;
+	if (!fp) {
+		debug("  Could not open file '/tmp/ocheck.leaks' for leak dump");
+		exit(1);
+	}
 
-	if (!now && --flush_counter > 0)
-		return 0;
+	real_fprintf(fp, "{\n");
 
-	/* Make sure flush_counter cannot get to zero while calling flush_messages() */
-	flush_counter = 999999999;
+	flushed += flush_messages_in_store(get_alloc_msg_store(), fp, "allocs");
+	real_fprintf(fp, ",\n");
+	flushed += flush_messages_in_store(get_files_msg_store(), fp, "files");
 
-	curr_flush_state = BUSY;
-	clr_msg = (struct msg_common *) send_buf;
-	clr_msg->magic = MSG_MAGIC_NUMBER;
-	clr_msg->type  = CLEAR;
-	pos += sizeof(struct msg_common);
-	len = sizeof(send_buf);
+	real_fprintf(fp, "\n}\n");
 
-	flushed += flush_messages_in_store(get_alloc_msg_store(), send_buf, &len, &pos);
-	flushed += flush_messages_in_store(get_files_msg_store(), send_buf, &len, &pos);
-
-	if (pos > 0 && write_retry(fd, (uint8_t *) send_buf, pos) < 0)
-		debug_exit("Could not send messages\n");
-
-	curr_flush_state = IDLE;
-	flush_counter = max_flush_counter;
-	return flushed;
+	fflush(fp);
+	real_fclose(fp);
+	debug("  Flushed %u messages\n", flushed);
 }
 
 static inline void call_msg_invalidate(struct call_msg *msg)
@@ -233,11 +139,6 @@ static void store_message(struct call_msg_store *store, struct call_msg *msg,
 	msg->fd    = fd;
 	msg->size  = size; 
 	memcpy(msg->frames, frames, sizeof(msg->frames));
-
-	if (max_flush_counter <= 0)
-		return;
-
-	flush_messages(false);
 }
 
 void store_message_by_ptr(struct call_msg_store *store, uintptr_t ptr, size_t size, uintptr_t *frames)
@@ -336,9 +237,7 @@ static void ocheck_init_store(struct call_msg_store *store)
 
 static __attribute__((constructor(101))) void ocheck_init()
 {
-	struct proc_msg msg;
 	const char *proc_name;
-	const char *s;
 
 	/* Do not re-initialize if already initialized and it's the same pid */
 	if (lib_inited && (pid == ourgetpid()))
@@ -356,23 +255,8 @@ static __attribute__((constructor(101))) void ocheck_init()
 
 	debug("Initializing libocheck.so for %s.%u...\n", proc_name, pid);
 
-	initialize_sock();
-
-	/* if max_flush_counter <= 0 then flush only on ocheck_fini() */
-	if ((s = getenv("FLUSH_COUNT")) && strlen(s))
-		max_flush_counter = atoi(s);
-
-	flush_counter = max_flush_counter;
-	debug("  Flush counter %u\n", flush_counter);
-
 	ocheck_init_store(get_alloc_msg_store());
 	ocheck_init_store(get_files_msg_store());
-
-	/* We won't get here, since initialize_sock() calls exit(1) in case something does not init  */
-	msg.magic = MSG_MAGIC_NUMBER;
-	msg.type  = PROC_NAME;
-	snprintf(msg.name, sizeof(msg.name), "%s.%d", proc_name, pid);
-	write_retry(fd, (uint8_t *)&msg, sizeof(msg));
 
 	debug("done\n");
 	lib_inited = true;
@@ -380,7 +264,6 @@ static __attribute__((constructor(101))) void ocheck_init()
 
 static __attribute__((destructor(101))) void ocheck_fini()
 {
-	uint32_t flushed = 0;
 	const char *proc_name;
 
 	/* Prevent forks from calling de-init code */
@@ -392,22 +275,7 @@ static __attribute__((destructor(101))) void ocheck_fini()
 
 	debug("Uninitializing libocheck.so for %s.%u...\n", proc_name, pid);
 
-	if (fd > -1) {
-		if (curr_flush_state == BUSY) {
-			debug("  Flushing still in progress...\n");
-			curr_flush_state = INTERRUPT;
-			while (curr_flush_state != IDLE)
-				wait_data(fd, true);
-		}
-
-		flushed = flush_messages(true);
-		close(fd);
-	}
-
-	debug("  Flushed %u messages\n", flushed);
-
-	if (pid > -1 && flushed)
-		kill(pid, SIGSEGV);
+	flush_messages();
 
 	debug("Done\n");
 out:
