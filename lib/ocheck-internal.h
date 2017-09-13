@@ -10,8 +10,8 @@ extern bool lib_inited;
 struct call_msg_store {
 	enum msg_type type;
 	uint32_t total_count;
-	uint32_t upper_index_limit;
-	uint32_t messages_count;
+	uint32_t max_store_expansion;
+	uint32_t capacity;
 	struct call_msg messages[];
 };
 

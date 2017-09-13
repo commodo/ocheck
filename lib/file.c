@@ -9,7 +9,7 @@
 #define FILES_MESSAGES_COUNT	(64 * 1024)
 static struct call_msg_store files_msg_store = {
 	.type = FILES,
-	.messages_count = FILES_MESSAGES_COUNT,
+	.capacity = FILES_MESSAGES_COUNT,
 	.messages[FILES_MESSAGES_COUNT] = {0}
 };
 

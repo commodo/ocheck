@@ -12,7 +12,7 @@
 #define ALLOC_MESSAGES_COUNT	(128 * 1024)
 static struct call_msg_store alloc_msg_store = {
 	.type = ALLOC,
-	.messages_count = ALLOC_MESSAGES_COUNT,
+	.capacity = ALLOC_MESSAGES_COUNT,
 	.messages[ALLOC_MESSAGES_COUNT] = {0},
 };
 

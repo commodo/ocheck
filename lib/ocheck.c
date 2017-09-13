@@ -41,8 +41,10 @@ static uint32_t flush_messages_in_store(struct call_msg_store *store, FILE *fp, 
 
 	real_fprintf(fp, "\t\"%s\": {\n", name);
 	real_fprintf(fp, "\t\t\"total_count\": %u,\n", store->total_count);
+	real_fprintf(fp, "\t\t\"max_store_expansion\": %u,\n", store->max_store_expansion);
+	real_fprintf(fp, "\t\t\"capacity\": %u,\n", store->capacity);
 
-	for (i = 0; i < store->upper_index_limit; i++) {
+	for (i = 0; i < store->max_store_expansion; i++) {
 		if (messages[i].type == INVALID)
 			continue;
 		real_fprintf(fp, "\t\t\"ptr\" : \"0x%"PRIxPTR_PAD "\"\n", messages[i].ptr);
@@ -94,7 +96,7 @@ static struct call_msg *call_msg_find_by_ptr(struct call_msg_store *store, uintp
 	if (!ptr)
 		return NULL;
 	messages = store->messages;
-	for (i = 0; i < store->upper_index_limit; i++) {
+	for (i = 0; i < store->max_store_expansion; i++) {
 		if (messages[i].ptr == ptr)
 			return &messages[i];
 	}
@@ -108,7 +110,7 @@ static struct call_msg *call_msg_find_by_fd(struct call_msg_store *store, int fd
 	if (fd < 0)
 		return NULL;
 	messages = store->messages;
-	for (i = 0; i < store->upper_index_limit; i++) {
+	for (i = 0; i < store->max_store_expansion; i++) {
 		if (messages[i].fd == fd)
 			return &messages[i];
 	}
@@ -119,12 +121,12 @@ static inline struct call_msg *call_msg_get_free(struct call_msg_store *store)
 {
 	int i;
 	struct call_msg *messages = store->messages;
-	for (i = 0; i < store->upper_index_limit; i++) {
+	for (i = 0; i < store->max_store_expansion; i++) {
 		if (messages[i].type == INVALID)
 			return &messages[i];
 	}
-	if (store->upper_index_limit < store->messages_count)
-		return &messages[store->upper_index_limit++];
+	if (store->max_store_expansion < store->capacity)
+		return &messages[store->max_store_expansion++];
 	return NULL;
 }
 
@@ -231,7 +233,7 @@ static const char *is_this_the_right_proc()
 static void ocheck_init_store(struct call_msg_store *store)
 {
 	int i;
-	for (i = 0; i < store->messages_count; i++)
+	for (i = 0; i < store->capacity; i++)
 		store->messages[i].fd = -1;
 }
 
